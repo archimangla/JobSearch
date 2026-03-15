@@ -1,12 +1,11 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/claude",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/public/index.html"
+  "functions": {
+    "api/app.py": {
+      "runtime": "python3.9"
     }
+  },
+  "routes": [
+    { "src": "/api/claude", "dest": "/api/app.py" },
+    { "src": "/(.*)", "dest": "/public/index.html" }
   ]
 }
