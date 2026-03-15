@@ -162,7 +162,12 @@
   <div class="panel active" id="tab-email">
     <div class="card">
       <div class="grid2">
-        <div><div class="lbl">Recruiter / HR name (optional)</div><input type="text" id="recipientName" placeholder="e.g. Priya Sharma"></div>
+        <div>
+          <div class="lbl">Recruiter / HR name (optional)</div>
+          <input type="text" id="recipientName" placeholder="e.g. Priya Sharma">
+          <div class="lbl" style="margin-top:8px">Recruiter email (optional)</div>
+          <input type="email" id="recipientEmail" placeholder="e.g. hr@company.com">
+        </div>
         <div><div class="lbl">Tone</div>
           <select id="emailTone">
             <option value="professional">Professional</option>
@@ -171,9 +176,16 @@
           </select>
         </div>
       </div>
-      <div class="btn-row"><button class="btn primary" onclick="generateEmail()">Generate email ↗</button></div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="generateEmail()">Generate email ↗</button>
+        <button class="btn" onclick="findRecruiters()">🔍 Find recruiters via Apollo</button>
+      </div>
       <div class="prog" id="emailProg"><div class="prog-fill"></div></div>
       <div class="status" id="emailStatus"></div>
+    </div>
+    <div id="apolloResult" style="display:none" class="result-section">
+      <div class="rlbl">Recruiters found</div>
+      <div id="recruiterCards" style="display:flex;flex-direction:column;gap:8px;margin-top:6px"></div>
     </div>
     <div id="emailResult" style="display:none" class="result-section">
       <div class="rlbl">Subject line</div>
@@ -181,7 +193,8 @@
       <div class="rlbl">Body</div>
       <div class="result-box" id="emailBody"></div>
       <div class="btn-row">
-        <button class="btn primary" onclick="copyEmail()">Copy full email</button>
+        <button class="btn primary" onclick="openInGmail()">📨 Open in Gmail</button>
+        <button class="btn" onclick="copyEmail()">Copy email</button>
         <button class="btn" onclick="generateEmail()">Regenerate</button>
       </div>
     </div>
@@ -309,6 +322,78 @@ function copyEmail() {
   const s = document.getElementById('emailSubject').textContent;
   const b = document.getElementById('emailBody').textContent;
   navigator.clipboard.writeText('Subject: '+s+'\n\n'+b).then(() => alert('Email copied!')).catch(() => alert('Copy failed.'));
+}
+function openInGmail(to) {
+  const subject = document.getElementById('emailSubject').textContent;
+  const body = document.getElementById('emailBody').textContent;
+  const recipient = to || document.getElementById('recipientEmail').value.trim() || extractEmailFromJD();
+  const url = 'https://mail.google.com/mail/?view=cm&fs=1'
+    + (recipient ? '&to=' + encodeURIComponent(recipient) : '')
+    + '&su=' + encodeURIComponent(subject)
+    + '&body=' + encodeURIComponent(body);
+  window.open(url, '_blank');
+}
+function extractEmailFromJD() {
+  const jd = document.getElementById('jdText').value;
+  const match = jd.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+  return match ? match[0] : '';
+}
+async function findRecruiters() {
+  const c = ctx();
+  if (!c.company) { alert('Fill in company name first.'); return; }
+  done('email', 'Searching Apollo for recruiters...', 'loading');
+  document.getElementById('apolloResult').style.display = 'none';
+  document.getElementById('emailProg').classList.add('on');
+  try {
+    const res = await fetch('/api/apollo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: c.company, domain: '' })
+    });
+    const data = await res.json();
+    document.getElementById('emailProg').classList.remove('on');
+    if (data.error) { done('email', 'Apollo error: ' + data.error, 'error'); return; }
+    const people = data.people || [];
+    if (!people.length) { done('email', 'No recruiters found on Apollo for this company.', 'error'); return; }
+    const container = document.getElementById('recruiterCards');
+    container.innerHTML = '';
+    people.forEach(p => {
+      const card = document.createElement('div');
+      card.style.cssText = 'background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;';
+      const info = document.createElement('div');
+      info.innerHTML = '<div style="font-weight:500;font-size:13px">' + (p.name||'Unknown') + '</div>'
+        + '<div style="font-size:12px;color:var(--muted)">' + (p.title||'') + '</div>'
+        + (p.email ? '<div style="font-size:12px;color:var(--blue);margin-top:2px">' + p.email + '</div>' : '<div style="font-size:11px;color:var(--muted);margin-top:2px">Email not available — enrich on Apollo</div>');
+      const btns = document.createElement('div');
+      btns.style.cssText = 'display:flex;gap:6px;flex-shrink:0;';
+      if (p.email) {
+        const useBtn = document.createElement('button');
+        useBtn.className = 'btn primary'; useBtn.style.fontSize = '12px'; useBtn.style.padding = '5px 10px';
+        useBtn.textContent = 'Use this email';
+        useBtn.onclick = () => { document.getElementById('recipientEmail').value = p.email; document.getElementById('recipientName').value = p.name; done('email', 'Recruiter selected — generate email now!', 'ok'); };
+        btns.appendChild(useBtn);
+        const gmailBtn = document.createElement('button');
+        gmailBtn.className = 'btn'; gmailBtn.style.fontSize = '12px'; gmailBtn.style.padding = '5px 10px';
+        gmailBtn.textContent = '📨 Gmail';
+        gmailBtn.onclick = () => openInGmail(p.email);
+        btns.appendChild(gmailBtn);
+      }
+      if (p.linkedin) {
+        const liBtn = document.createElement('button');
+        liBtn.className = 'btn'; liBtn.style.fontSize = '12px'; liBtn.style.padding = '5px 10px';
+        liBtn.textContent = 'LinkedIn';
+        liBtn.onclick = () => window.open(p.linkedin, '_blank');
+        btns.appendChild(liBtn);
+      }
+      card.appendChild(info); card.appendChild(btns);
+      container.appendChild(card);
+    });
+    document.getElementById('apolloResult').style.display = 'block';
+    done('email', people.length + ' recruiter(s) found.', 'ok');
+  } catch(e) {
+    document.getElementById('emailProg').classList.remove('on');
+    done('email', 'Error: ' + e.message, 'error');
+  }
 }
 function ctx() {
   return {
