@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Archi's Job Search Assistant</title>
+  <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f5f5f2;
+      --surface: #ffffff;
+      --border: #e3e2dc;
+      --border-md: #c8c7c0;
+      --text: #1c1c1a;
+      --muted: #6b6b65;
+      --hint: #9a9a93;
+      --green: #166534;
+      --green-bg: #f0fdf4;
+      --green-b: #bbf7d0;
+      --blue: #1d4ed8;
+      --blue-bg: #eff6ff;
+      --red: #991b1b;
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; min-height: 100vh; }
+    .app { max-width: 880px; margin: 0 auto; padding: 2.5rem 1.5rem 3rem; }
+
+    /* Header */
+    .header { margin-bottom: 2rem; }
+    .header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+    .header p { font-size: 13px; color: var(--muted); margin-top: 3px; }
+
+    /* Context panel */
+    .ctx-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem; }
+    .ctx-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+    .ctx-header h2 { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .ctx-body { margin-top: 1.1rem; }
+    .ctx-body.hidden { display: none; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    /* Upload */
+    .upload-zone { border: 1.5px dashed var(--border-md); border-radius: var(--radius-sm); padding: 1.5rem 1rem; text-align: center; cursor: pointer; transition: all 0.15s; background: var(--bg); height: 100%; min-height: 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .upload-zone:hover { border-color: var(--text); }
+    .upload-zone.loaded { border-style: solid; border-color: var(--green-b); background: var(--green-bg); }
+    .u-icon { font-size: 22px; margin-bottom: 6px; }
+    .u-text { font-size: 12px; color: var(--muted); }
+    .u-name { font-size: 12px; font-weight: 600; color: var(--green); margin-top: 4px; }
+
+    /* Form elements */
+    .lbl { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; margin-top: 12px; }
+    .lbl:first-child { margin-top: 0; }
+    input[type=text], input[type=email], textarea, select {
+      width: 100%; font-family: inherit; font-size: 13px; color: var(--text);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 8px 10px; outline: none; transition: border 0.15s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--text); box-shadow: 0 0 0 2px rgba(28,28,26,0.06); }
+    textarea { resize: vertical; line-height: 1.55; }
+
+    /* Tabs */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; gap: 0; }
+    .tab { padding: 9px 18px; font-size: 13px; font-weight: 500; border: none; background: none; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; font-family: inherit; white-space: nowrap; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--text); border-bottom-color: var(--text); }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* Card */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+    .card-desc { font-size: 12px; color: var(--muted); line-height: 1.65; margin-bottom: 14px; }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 15px; font-size: 13px; font-weight: 500; font-family: inherit; border: 1px solid var(--border-md); border-radius: var(--radius-sm); background: transparent; color: var(--text); cursor: pointer; transition: all 0.15s; }
+    .btn:hover { background: var(--bg); }
+    .btn:active { transform: scale(0.98); }
+    .btn.primary { background: var(--text); color: #fff; border-color: var(--text); }
+    .btn.primary:hover { opacity: 0.87; }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+    /* Results */
+    .result-section { margin-top: 1rem; }
+    .rlbl { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; margin-top: 12px; }
+    .rlbl:first-child { margin-top: 0; }
+    .result-box { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; font-size: 13px; line-height: 1.75; white-space: pre-wrap; max-height: 360px; overflow-y: auto; }
+    .result-box.subj { max-height: 50px; font-weight: 600; overflow: hidden; }
+
+    /* Status */
+    .status { font-size: 12px; margin-top: 7px; min-height: 18px; color: var(--muted); }
+    .status.loading { color: var(--blue); }
+    .status.error { color: var(--red); }
+    .status.ok { color: var(--green); }
+    .prog { height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 8px; display: none; }
+    .prog.on { display: block; }
+    .prog-fill { height: 100%; background: var(--text); animation: sweep 1.7s ease-in-out infinite; }
+    @keyframes sweep { 0%{width:0%;margin-left:0} 50%{width:55%;margin-left:22%} 100%{width:0%;margin-left:100%} }
+
+    /* Badge */
+    .badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; background: var(--blue-bg); color: var(--blue); border: 1px solid #bfdbfe; }
+    .badge.ok { background: var(--green-bg); color: var(--green); border-color: var(--green-b); }
+
+    /* Notion grid */
+    .notion-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .fgroup { display: flex; flex-direction: column; gap: 5px; }
+
+    /* Arrow */
+    .arrow { font-size: 11px; color: var(--hint); transition: transform 0.2s; }
+    .arrow.open { transform: rotate(180deg); }
+
+    @media(max-width:600px) { .grid2, .notion-grid { grid-template-columns: 1fr; } .tabs { overflow-x: auto; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>Job Search Assistant</h1>
+    <p>Upload your resume &amp; JD once — draft emails, answer forms, tailor resume, update Notion.</p>
+  </div>
+
+  <!-- Context -->
+  <div class="ctx-panel">
+    <div class="ctx-header" onclick="toggleCtx()">
+      <h2>Resume &amp; JD <span class="badge" id="ctxBadge">not uploaded</span></h2>
+      <span class="arrow" id="ctxArrow">▼</span>
+    </div>
+    <div class="ctx-body" id="ctxBody">
+      <div class="grid2" style="margin-top:12px">
+        <div>
+          <div class="lbl">Resume (PDF or DOCX)</div>
+          <div class="upload-zone" id="resumeZone" onclick="document.getElementById('rFile').click()">
+            <div class="u-icon">📄</div>
+            <div class="u-text">Click to upload</div>
+            <div class="u-name" id="rName"></div>
+          </div>
+          <input type="file" id="rFile" accept=".pdf,.docx" style="display:none" onchange="handleUpload(this)">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div class="lbl">Job description</div>
+            <textarea id="jdText" rows="6" placeholder="Paste full JD here..."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:10px">
+        <div><div class="lbl">Company</div><input type="text" id="companyName" placeholder="e.g. Atlassian"></div>
+        <div><div class="lbl">Role</div><input type="text" id="roleTitle" placeholder="e.g. SWE Intern"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab(this,'email')">📧 Outreach email</button>
+    <button class="tab" onclick="switchTab(this,'form')">📝 Form answers</button>
+    <button class="tab" onclick="switchTab(this,'resume')">✨ Tailor resume</button>
+    <button class="tab" onclick="switchTab(this,'notion')">🗂 Notion update</button>
+  </div>
+
+  <!-- EMAIL -->
+  <div class="panel active" id="tab-email">
+    <div class="card">
+      <div class="grid2">
+        <div><div class="lbl">Recruiter / HR name (optional)</div><input type="text" id="recipientName" placeholder="e.g. Priya Sharma"></div>
+        <div><div class="lbl">Tone</div>
+          <select id="emailTone">
+            <option value="professional">Professional</option>
+            <option value="warm and professional">Warm &amp; professional</option>
+            <option value="concise and direct">Concise &amp; direct</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row"><button class="btn primary" onclick="generateEmail()">Generate email ↗</button></div>
+      <div class="prog" id="emailProg"><div class="prog-fill"></div></div>
+      <div class="status" id="emailStatus"></div>
+    </div>
+    <div id="emailResult" style="display:none" class="result-section">
+      <div class="rlbl">Subject line</div>
+      <div class="result-box subj" id="emailSubject"></div>
+      <div class="rlbl">Body</div>
+      <div class="result-box" id="emailBody"></div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="copyEmail()">Copy full email</button>
+        <button class="btn" onclick="generateEmail()">Regenerate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORM -->
+  <div class="panel" id="tab-form">
+    <div class="card">
+      <div class="lbl">Form question</div>
+      <textarea id="formQuestion" rows="3" placeholder="e.g. Why do you want to work here? / Describe a challenge you overcame."></textarea>
+      <div class="grid2">
+        <div><div class="lbl">Word limit (optional)</div><input type="text" id="wordLimit" placeholder="e.g. 150 words"></div>
+        <div><div class="lbl">Tone</div>
+          <select id="formTone">
+            <option value="professional and genuine">Professional &amp; genuine</option>
+            <option value="concise and direct">Concise &amp; direct</option>
+            <option value="enthusiastic but grounded">Enthusiastic</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row"><button class="btn primary" onclick="generateFormAnswer()">Generate answer ↗</button></div>
+      <div class="prog" id="formProg"><div class="prog-fill"></div></div>
+      <div class="status" id="formStatus"></div>
+    </div>
+    <div id="formResult" style="display:none" class="result-section">
+      <div class="rlbl">Answer</div>
+      <div class="result-box" id="formAnswer"></div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="copyEl('formAnswer')">Copy answer</button>
+        <button class="btn" onclick="generateFormAnswer()">Regenerate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESUME -->
+  <div class="panel" id="tab-resume">
+    <div class="card">
+      <p class="card-desc">Claude reads your uploaded resume and rewrites bullets / adds a summary to match the JD — without inventing experience or changing your structure.</p>
+      <div class="lbl">Tailoring focus</div>
+      <select id="tailorFocus">
+        <option value="highlight matching skills and reorder bullet points to match the JD">Highlight matching skills</option>
+        <option value="rewrite bullet points to use JD keywords while keeping all facts accurate">Rewrite bullets for JD keywords</option>
+        <option value="add a tailored 2–3 line professional summary at the top">Add tailored summary</option>
+        <option value="full tailoring: add a summary, rewrite bullets with JD keywords, reorder skills">Full tailoring</option>
+      </select>
+      <div class="btn-row"><button class="btn primary" onclick="tailorResume()">Tailor &amp; download DOCX ↗</button></div>
+      <div class="prog" id="resumeProg"><div class="prog-fill"></div></div>
+      <div class="status" id="resumeStatus"></div>
+    </div>
+    <div id="resumeResult" style="display:none" class="result-section">
+      <div class="rlbl">Preview</div>
+      <div class="result-box" id="resumePreview"></div>
+      <div class="btn-row">
+        <button class="btn primary" id="dlBtn" onclick="downloadDocx()">Download DOCX</button>
+        <button class="btn" onclick="copyEl('resumePreview')">Copy text</button>
+        <button class="btn" onclick="tailorResume()">Re-tailor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTION -->
+  <div class="panel" id="tab-notion">
+    <div class="card">
+      <div class="notion-grid">
+        <div class="fgroup"><div class="lbl">Application date</div><input type="text" id="appDate" placeholder="15 Mar 2026"></div>
+        <div class="fgroup"><div class="lbl">Status</div>
+          <select id="appStatus">
+            <option>Applied</option><option>Email sent</option><option>Follow-up sent</option>
+            <option>Interview scheduled</option><option>Rejected</option><option>Offer received</option>
+          </select>
+        </div>
+        <div class="fgroup"><div class="lbl">Recruiter email</div><input type="email" id="recruiterEmail" placeholder="hr@company.com"></div>
+        <div class="fgroup"><div class="lbl">Source</div>
+          <select id="appSource">
+            <option>LinkedIn</option><option>Company website</option><option>Internshala</option>
+            <option>Naukri</option><option>Referral</option><option>Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="lbl">Notes</div>
+      <textarea id="appNotes" rows="2" placeholder="Anything worth tracking..."></textarea>
+      <div class="btn-row">
+        <button class="btn primary" onclick="generateNotionEntry()">Generate Notion entry ↗</button>
+        <button class="btn" onclick="generateFollowUp()">Generate follow-up email ↗</button>
+      </div>
+      <div class="prog" id="notionProg"><div class="prog-fill"></div></div>
+      <div class="status" id="notionStatus"></div>
+    </div>
+    <div id="notionResult" style="display:none" class="result-section">
+      <div class="rlbl" id="notionLbl">Notion entry</div>
+      <div class="result-box" id="notionEntry"></div>
+      <div class="btn-row"><button class="btn primary" onclick="copyEl('notionEntry')">Copy</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let resumeB64 = '', resumeMediaType = '', tailoredContent = '';
+
+function toggleCtx() {
+  const b = document.getElementById('ctxBody');
+  const a = document.getElementById('ctxArrow');
+  b.classList.toggle('hidden');
+  a.classList.toggle('open');
+}
+function switchTab(btn, name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+function setLoading(p, msg) {
+  document.getElementById(p+'Prog').classList.add('on');
+  const s = document.getElementById(p+'Status'); s.textContent = msg; s.className = 'status loading';
+}
+function done(p, msg, type) {
+  document.getElementById(p+'Prog').classList.remove('on');
+  const s = document.getElementById(p+'Status'); s.textContent = msg; s.className = 'status ' + type;
+}
+function copyEl(id) {
+  navigator.clipboard.writeText(document.getElementById(id).textContent)
+    .then(() => alert('Copied!')).catch(() => alert('Select and copy manually.'));
+}
+function copyEmail() {
+  const s = document.getElementById('emailSubject').textContent;
+  const b = document.getElementById('emailBody').textContent;
+  navigator.clipboard.writeText('Subject: '+s+'\n\n'+b).then(() => alert('Email copied!')).catch(() => alert('Copy failed.'));
+}
+function ctx() {
+  return {
+    company: document.getElementById('companyName').value.trim(),
+    role: document.getElementById('roleTitle').value.trim(),
+    jd: document.getElementById('jdText').value.trim(),
+  };
+}
+
+function handleUpload(input) {
+  const file = input.files[0]; if (!file) return;
+  document.getElementById('rName').textContent = file.name;
+  document.getElementById('resumeZone').classList.add('loaded');
+  resumeMediaType = file.name.endsWith('.pdf') ? 'application/pdf'
+    : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const badge = document.getElementById('ctxBadge');
+  badge.textContent = 'resume loaded'; badge.className = 'badge ok';
+  const reader = new FileReader();
+  reader.onload = e => { resumeB64 = e.target.result.split(',')[1]; };
+  reader.readAsDataURL(file);
+}
+
+async function callClaude(system, content) {
+  const body = {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1500,
+    system,
+    messages: [{ role: 'user', content }]
+  };
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error?.message || 'API error ' + res.status);
+  }
+  const data = await res.json();
+  return data.content.map(b => b.text || '').join('');
+}
+
+async function callClaudeWithResume(system, text) {
+  const content = [];
+  if (resumeB64) {
+    content.push({ type: 'document', source: { type: 'base64', media_type: resumeMediaType, data: resumeB64 } });
+  }
+  content.push({ type: 'text', text });
+  return callClaude(system, content);
+}
+
+async function generateEmail() {
+  const c = ctx();
+  if (!c.company || !c.role) { alert('Fill in company name and role first.'); return; }
+  setLoading('email', 'Drafting outreach email...');
+  document.getElementById('emailResult').style.display = 'none';
+  try {
+    const tone = document.getElementById('emailTone').value;
+    const recipient = document.getElementById('recipientName').value.trim();
+    const sys = `You draft ${tone} cold outreach emails for job/internship applications. The applicant is Archi Mangla — CS student at IIT Madras (BS program, transitioning to diploma phase) who recently completed a CS internship at Frauscher Sensor Technology (completed Feb 2026). Skills: Python, Flask, Django, React, C++, ML, Pandas, UI/UX, Figma. Always mention both the IIT Madras BS degree and the recently completed internship. Keep under 200 words. No filler phrases like "I am passionate about". End with a clear CTA. Return EXACTLY:\nSUBJECT: [subject line]\nBODY:\n[email body]`;
+    const prompt = `Company: ${c.company}\nRole: ${c.role}\n${recipient ? 'Recipient: '+recipient : ''}\n${c.jd ? 'JD (first 600 chars):\n'+c.jd.slice(0,600) : ''}\n\nDraft the outreach email now.`;
+    const result = await callClaudeWithResume(sys, prompt);
+    const subMatch = result.match(/SUBJECT:\s*(.+)/);
+    const bodyMatch = result.match(/BODY:\s*([\s\S]+)/);
+    document.getElementById('emailSubject').textContent = subMatch ? subMatch[1].trim() : '';
+    document.getElementById('emailBody').textContent = bodyMatch ? bodyMatch[1].trim() : result;
+    document.getElementById('emailResult').style.display = 'block';
+    done('email', 'Email ready.', 'ok');
+  } catch(e) { done('email', 'Error: '+e.message, 'error'); }
+}
+
+async function generateFormAnswer() {
+  const question = document.getElementById('formQuestion').value.trim();
+  if (!question) { alert('Enter the form question first.'); return; }
+  const c = ctx();
+  setLoading('form', 'Writing your answer...');
+  document.getElementById('formResult').style.display = 'none';
+  try {
+    const wl = document.getElementById('wordLimit').value.trim();
+    const tone = document.getElementById('formTone').value;
+    const sys = `You write ${tone} answers to job application form questions for Archi Mangla — CS student at IIT Madras BS program (transitioning to diploma), recently completed CS internship at Frauscher Sensor Technology (Feb 2026). Background: Python, Flask, Django, React, C++, ML pipelines, Pandas, UI/UX, Figma, railway signaling dashboards, competitive programming (LeetCode). Interests: poetry, public speaking, combining tech with social impact. Sound genuine and specific. Never use "I am passionate about" or "I have always been interested in" or similar filler.`;
+    const prompt = `Company: ${c.company||'this company'}\nRole: ${c.role||'this role'}\n${c.jd ? 'JD context:\n'+c.jd.slice(0,500) : ''}\n${wl ? 'Word limit: '+wl : ''}\n\nQuestion: ${question}\n\nWrite the answer now.`;
+    const result = await callClaudeWithResume(sys, prompt);
+    document.getElementById('formAnswer').textContent = result.trim();
+    document.getElementById('formResult').style.display = 'block';
+    done('form', 'Answer ready.', 'ok');
+  } catch(e) { done('form', 'Error: '+e.message, 'error'); }
+}
+
+async function tailorResume() {
+  if (!resumeB64) { alert('Upload your resume first.'); return; }
+  const c = ctx();
+  if (!c.jd) { alert('Paste the job description first.'); return; }
+  setLoading('resume', 'Reading resume and tailoring to JD...');
+  document.getElementById('resumeResult').style.display = 'none';
+  try {
+    const focus = document.getElementById('tailorFocus').value;
+    const sys = `You are a professional resume tailor. Rules: (1) Never invent experience or skills not in the original resume. (2) Keep all section headers and overall structure identical — only edit text within sections. (3) Tailoring focus: ${focus}. (4) Output the full tailored resume as plain text with section headers in ALL CAPS. (5) End with:\n---\nCHANGES: [one-line summary of what changed]`;
+    const prompt = `Target company: ${c.company||'the company'}\nTarget role: ${c.role||'the role'}\nJob Description:\n${c.jd}\n\nTailor my resume for this JD following the rules above. Output the full resume.`;
+    const result = await callClaudeWithResume(sys, prompt);
+    tailoredContent = result.trim();
+    document.getElementById('resumePreview').textContent = tailoredContent;
+    document.getElementById('resumeResult').style.display = 'block';
+    done('resume', 'Done — click Download DOCX to save.', 'ok');
+  } catch(e) { done('resume', 'Error: '+e.message, 'error'); }
+}
+
+async function downloadDocx() {
+  if (!tailoredContent) return;
+  const btn = document.getElementById('dlBtn');
+  btn.disabled = true; btn.textContent = 'Building DOCX...';
+  done('resume', 'Generating DOCX...', 'loading');
+  try {
+    const c = ctx();
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, LevelFormat } = window.docx;
+    const numbering = { config: [{ reference: 'bullets', levels: [{ level: 0, format: LevelFormat.BULLET, text: '•', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] }] };
+    const children = [];
+    for (const line of tailoredContent.split('\n')) {
+      const t = line.trim();
+      if (!t) { children.push(new Paragraph({ children: [new TextRun('')] })); continue; }
+      if (t.startsWith('---')) continue;
+      if (t.startsWith('CHANGES:')) {
+        children.push(new Paragraph({ children: [new TextRun({ text: t, italics: true, color: '999999', size: 18 })] }));
+      } else if (t === t.toUpperCase() && t.length > 2 && !/^[•\-]/.test(t)) {
+        children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text: t, bold: true, size: 24 })] }));
+      } else if (/^[•\-]/.test(t)) {
+        children.push(new Paragraph({ numbering: { reference: 'bullets', level: 0 }, children: [new TextRun({ text: t.replace(/^[•\-]\s*/, ''), size: 22 })] }));
+      } else {
+        children.push(new Paragraph({ children: [new TextRun({ text: t, size: 22 })] }));
+      }
+    }
+    const doc = new Document({ numbering, sections: [{ properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 } } }, children }] });
+    const buffer = await Packer.toBuffer(doc);
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `Archi_Mangla_${(c.company||'Resume').replace(/\s+/g,'_')}_Tailored.docx`;
+    a.click(); URL.revokeObjectURL(url);
+    done('resume', 'DOCX downloaded!', 'ok');
+  } catch(e) { done('resume', 'DOCX error: '+e.message, 'error'); }
+  btn.disabled = false; btn.textContent = 'Download DOCX';
+}
+
+async function generateNotionEntry() {
+  const c = ctx();
+  if (!c.company || !c.role) { alert('Fill in company and role first.'); return; }
+  setLoading('notion', 'Generating Notion entry...');
+  document.getElementById('notionResult').style.display = 'none';
+  try {
+    const date = document.getElementById('appDate').value.trim() || new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    const status = document.getElementById('appStatus').value;
+    const source = document.getElementById('appSource').value;
+    const email = document.getElementById('recruiterEmail').value.trim();
+    const notes = document.getElementById('appNotes').value.trim();
+    const sys = `Generate structured, scannable Notion database entries for job applications. Use emoji labels for each field. Include a 1-sentence fit assessment and a follow-up reminder date (exactly 5 business days from application date). Be concise.`;
+    const prompt = `Company: ${c.company}\nRole: ${c.role}\nDate applied: ${date}\nStatus: ${status}\nSource: ${source}\n${email?'Recruiter email: '+email:''}\n${notes?'Notes: '+notes:''}\n${c.jd?'JD snippet:\n'+c.jd.slice(0,300):''}\n\nGenerate the Notion entry now.`;
+    const result = await callClaude(sys, prompt);
+    document.getElementById('notionEntry').textContent = result.trim();
+    document.getElementById('notionLbl').textContent = 'Notion entry';
+    document.getElementById('notionResult').style.display = 'block';
+    done('notion', 'Entry ready — copy and paste into Notion.', 'ok');
+  } catch(e) { done('notion', 'Error: '+e.message, 'error'); }
+}
+
+async function generateFollowUp() {
+  const c = ctx();
+  if (!c.company || !c.role) { alert('Fill in company and role first.'); return; }
+  setLoading('notion', 'Drafting follow-up email...');
+  document.getElementById('notionResult').style.display = 'none';
+  try {
+    const email = document.getElementById('recruiterEmail').value.trim();
+    const sys = `Write brief, professional follow-up emails for job applications. From Archi Mangla, CS student at IIT Madras BS program + recently completed CS internship at Frauscher Sensor Technology (Feb 2026). Under 120 words. Warm but not desperate. No filler.`;
+    const prompt = `Company: ${c.company}\nRole: ${c.role}\n${email?'To: '+email:''}\nApplied ~5 days ago. Reiterate interest, politely ask for a status update.`;
+    const result = await callClaude(sys, prompt);
+    document.getElementById('notionEntry').textContent = result.trim();
+    document.getElementById('notionLbl').textContent = 'Follow-up email';
+    document.getElementById('notionResult').style.display = 'block';
+    done('notion', 'Follow-up ready — copy and send.', 'ok');
+  } catch(e) { done('notion', 'Error: '+e.message, 'error'); }
+}
+</script>
+</body>
+</html>
