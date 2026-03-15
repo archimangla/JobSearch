@@ -178,7 +178,7 @@
       </div>
       <div class="btn-row">
         <button class="btn primary" onclick="generateEmail()">Generate email ↗</button>
-        <button class="btn" onclick="findRecruiters()">🔍 Find recruiters via Apollo</button>
+        <button class="btn" onclick="findRecruiters()">🔍 Find recruiters on LinkedIn</button>
       </div>
       <div class="prog" id="emailProg"><div class="prog-fill"></div></div>
       <div class="status" id="emailStatus"></div>
@@ -259,34 +259,91 @@
   <div class="panel" id="tab-notion">
     <div class="card">
       <div class="notion-grid">
-        <div class="fgroup"><div class="lbl">Application date</div><input type="text" id="appDate" placeholder="15 Mar 2026"></div>
-        <div class="fgroup"><div class="lbl">Status</div>
+        <div class="fgroup">
+          <div class="lbl">Application date</div>
+          <input type="date" id="appDate">
+        </div>
+        <div class="fgroup">
+          <div class="lbl">Status</div>
           <select id="appStatus">
-            <option>Applied</option><option>Email sent</option><option>Follow-up sent</option>
-            <option>Interview scheduled</option><option>Rejected</option><option>Offer received</option>
+            <option value="Applied">Applied</option>
+            <option value="Interviewed">Interviewed</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Accepted">Accepted</option>
+            <option value="Offer">Offer</option>
           </select>
         </div>
-        <div class="fgroup"><div class="lbl">Recruiter email</div><input type="email" id="recruiterEmail" placeholder="hr@company.com"></div>
-        <div class="fgroup"><div class="lbl">Source</div>
-          <select id="appSource">
-            <option>LinkedIn</option><option>Company website</option><option>Internshala</option>
-            <option>Naukri</option><option>Referral</option><option>Other</option>
+        <div class="fgroup">
+          <div class="lbl">Portal / source</div>
+          <select id="appPortal">
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Internshala">Internshala</option>
+            <option value="Naukri">Naukri</option>
+            <option value="Company Website">Company Website</option>
+            <option value="Unstop">Unstop</option>
+            <option value="LinkedIn DM">LinkedIn DM</option>
+            <option value="Mail Id">Mail Id</option>
+            <option value="Indeed">Indeed</option>
+            <option value="WellFound">WellFound</option>
+            <option value="YC">YC</option>
+            <option value="GForms">GForms</option>
+            <option value="GreenHouse">GreenHouse</option>
+            <option value="Jobs Lever">Jobs Lever</option>
           </select>
+        </div>
+        <div class="fgroup">
+          <div class="lbl">Cold reach out</div>
+          <select id="coldReachOut">
+            <option value="">None</option>
+            <option value="Mail">Mail</option>
+            <option value="LinkedIn">LinkedIn</option>
+          </select>
+        </div>
+        <div class="fgroup">
+          <div class="lbl">Mode</div>
+          <select id="appMode">
+            <option value="">Unknown</option>
+            <option value="WFH">WFH</option>
+            <option value="WFO">WFO</option>
+            <option value="Hybrid">Hybrid</option>
+          </select>
+        </div>
+        <div class="fgroup">
+          <div class="lbl">Next action</div>
+          <select id="nextAction">
+            <option value="Follow up">Follow up</option>
+            <option value="Waiting">Waiting</option>
+            <option value="Assignment">Assignment</option>
+            <option value="Prepare Interview">Prepare Interview</option>
+            <option value="tech round">Tech round</option>
+            <option value="Decide">Decide</option>
+            <option value="nothing">Nothing</option>
+          </select>
+        </div>
+        <div class="fgroup">
+          <div class="lbl">Location</div>
+          <input type="text" id="appLocation" placeholder="e.g. Delhi, Remote">
+        </div>
+        <div class="fgroup">
+          <div class="lbl">Salary (₹)</div>
+          <input type="number" id="appSalary" placeholder="e.g. 25000">
         </div>
       </div>
       <div class="lbl">Notes</div>
       <textarea id="appNotes" rows="2" placeholder="Anything worth tracking..."></textarea>
       <div class="btn-row">
-        <button class="btn primary" onclick="generateNotionEntry()">Generate Notion entry ↗</button>
+        <button class="btn primary" onclick="addToNotion()">➕ Add to Notion DB ↗</button>
         <button class="btn" onclick="generateFollowUp()">Generate follow-up email ↗</button>
       </div>
       <div class="prog" id="notionProg"><div class="prog-fill"></div></div>
       <div class="status" id="notionStatus"></div>
     </div>
     <div id="notionResult" style="display:none" class="result-section">
-      <div class="rlbl" id="notionLbl">Notion entry</div>
+      <div class="rlbl" id="notionLbl">Result</div>
       <div class="result-box" id="notionEntry"></div>
-      <div class="btn-row"><button class="btn primary" onclick="copyEl('notionEntry')">Copy</button></div>
+      <div class="btn-row">
+        <button class="btn" id="notionOpenBtn" style="display:none" onclick="window.open(window._notionUrl,'_blank')">Open in Notion ↗</button>
+      </div>
     </div>
   </div>
 </div>
@@ -341,55 +398,48 @@ function extractEmailFromJD() {
 async function findRecruiters() {
   const c = ctx();
   if (!c.company) { alert('Fill in company name first.'); return; }
-  done('email', 'Searching Apollo for recruiters...', 'loading');
+  done('email', 'Building LinkedIn search links...', 'loading');
   document.getElementById('apolloResult').style.display = 'none';
   document.getElementById('emailProg').classList.add('on');
   try {
     const res = await fetch('/api/apollo', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company: c.company, domain: '' })
+      body: JSON.stringify({ company: c.company })
     });
     const data = await res.json();
     document.getElementById('emailProg').classList.remove('on');
-    if (data.error) { done('email', 'Apollo error: ' + data.error, 'error'); return; }
-    const people = data.people || [];
-    if (!people.length) { done('email', 'No recruiters found on Apollo for this company.', 'error'); return; }
+    if (data.error) { done('email', 'Error: ' + data.error, 'error'); return; }
+
     const container = document.getElementById('recruiterCards');
     container.innerHTML = '';
-    people.forEach(p => {
+
+    // Company people page
+    const companyCard = document.createElement('div');
+    companyCard.style.cssText = 'background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;';
+    companyCard.innerHTML = '<div><div style="font-weight:500;font-size:13px">All people at ' + c.company + '</div><div style="font-size:12px;color:var(--muted)">Browse everyone at this company on LinkedIn</div></div>';
+    const compBtn = document.createElement('button');
+    compBtn.className = 'btn primary'; compBtn.style.fontSize = '12px'; compBtn.style.padding = '5px 12px';
+    compBtn.textContent = '🔗 Open on LinkedIn';
+    compBtn.onclick = () => window.open(data.companyPeopleUrl, '_blank');
+    companyCard.appendChild(compBtn);
+    container.appendChild(companyCard);
+
+    // Individual role search links
+    (data.links || []).forEach(link => {
       const card = document.createElement('div');
       card.style.cssText = 'background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;';
-      const info = document.createElement('div');
-      info.innerHTML = '<div style="font-weight:500;font-size:13px">' + (p.name||'Unknown') + '</div>'
-        + '<div style="font-size:12px;color:var(--muted)">' + (p.title||'') + '</div>'
-        + (p.email ? '<div style="font-size:12px;color:var(--blue);margin-top:2px">' + p.email + '</div>' : '<div style="font-size:11px;color:var(--muted);margin-top:2px">Email not available — enrich on Apollo</div>');
-      const btns = document.createElement('div');
-      btns.style.cssText = 'display:flex;gap:6px;flex-shrink:0;';
-      if (p.email) {
-        const useBtn = document.createElement('button');
-        useBtn.className = 'btn primary'; useBtn.style.fontSize = '12px'; useBtn.style.padding = '5px 10px';
-        useBtn.textContent = 'Use this email';
-        useBtn.onclick = () => { document.getElementById('recipientEmail').value = p.email; document.getElementById('recipientName').value = p.name; done('email', 'Recruiter selected — generate email now!', 'ok'); };
-        btns.appendChild(useBtn);
-        const gmailBtn = document.createElement('button');
-        gmailBtn.className = 'btn'; gmailBtn.style.fontSize = '12px'; gmailBtn.style.padding = '5px 10px';
-        gmailBtn.textContent = '📨 Gmail';
-        gmailBtn.onclick = () => openInGmail(p.email);
-        btns.appendChild(gmailBtn);
-      }
-      if (p.linkedin) {
-        const liBtn = document.createElement('button');
-        liBtn.className = 'btn'; liBtn.style.fontSize = '12px'; liBtn.style.padding = '5px 10px';
-        liBtn.textContent = 'LinkedIn';
-        liBtn.onclick = () => window.open(p.linkedin, '_blank');
-        btns.appendChild(liBtn);
-      }
-      card.appendChild(info); card.appendChild(btns);
+      card.innerHTML = '<div><div style="font-weight:500;font-size:13px">' + link.title + '</div><div style="font-size:12px;color:var(--muted)">Search LinkedIn for ' + link.title + ' at ' + c.company + '</div></div>';
+      const btn = document.createElement('button');
+      btn.className = 'btn'; btn.style.fontSize = '12px'; btn.style.padding = '5px 12px';
+      btn.textContent = '🔍 Search';
+      btn.onclick = () => window.open(link.url, '_blank');
+      card.appendChild(btn);
       container.appendChild(card);
     });
+
     document.getElementById('apolloResult').style.display = 'block';
-    done('email', people.length + ' recruiter(s) found.', 'ok');
+    done('email', 'LinkedIn search links ready — find the right person and paste their email above.', 'ok');
   } catch(e) {
     document.getElementById('emailProg').classList.remove('on');
     done('email', 'Error: ' + e.message, 'error');
@@ -537,26 +587,43 @@ async function downloadDocx() {
   btn.disabled = false; btn.textContent = 'Download DOCX';
 }
 
-async function generateNotionEntry() {
+async function addToNotion() {
   const c = ctx();
-  if (!c.company || !c.role) { alert('Fill in company and role first.'); return; }
-  setLoading('notion', 'Generating Notion entry...');
+  if (!c.company) { alert('Fill in company name first.'); return; }
+  setLoading('notion', 'Adding to your Notion DB Applications...');
   document.getElementById('notionResult').style.display = 'none';
   try {
-    const date = document.getElementById('appDate').value.trim() || new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-    const status = document.getElementById('appStatus').value;
-    const source = document.getElementById('appSource').value;
-    const email = document.getElementById('recruiterEmail').value.trim();
-    const notes = document.getElementById('appNotes').value.trim();
-    const sys = `Generate structured, scannable Notion database entries for job applications. Use emoji labels for each field. Include a 1-sentence fit assessment and a follow-up reminder date (exactly 5 business days from application date). Be concise.`;
-    const prompt = `Company: ${c.company}\nRole: ${c.role}\nDate applied: ${date}\nStatus: ${status}\nSource: ${source}\n${email?'Recruiter email: '+email:''}\n${notes?'Notes: '+notes:''}\n${c.jd?'JD snippet:\n'+c.jd.slice(0,300):''}\n\nGenerate the Notion entry now.`;
-    const result = await callClaude(sys, prompt);
-    document.getElementById('notionEntry').textContent = result.trim();
-    document.getElementById('notionLbl').textContent = 'Notion entry';
+    const today = new Date().toISOString().split('T')[0];
+    const payload = {
+      company: c.company,
+      position: c.role,
+      applicationDate: document.getElementById('appDate').value || today,
+      status: document.getElementById('appStatus').value,
+      portal: document.getElementById('appPortal').value,
+      coldReachOut: document.getElementById('coldReachOut').value || null,
+      mode: document.getElementById('appMode').value || null,
+      nextAction: document.getElementById('nextAction').value,
+      location: document.getElementById('appLocation').value,
+      salary: document.getElementById('appSalary').value || null,
+      notes: document.getElementById('appNotes').value,
+    };
+    const res = await fetch('/api/notion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.error) { done('notion', 'Error: ' + data.error, 'error'); return; }
+    window._notionUrl = data.url;
+    document.getElementById('notionEntry').textContent = '✅ Added to DB Applications!\n\nCompany: ' + c.company + '\nPosition: ' + (c.role||'—') + '\nStatus: ' + payload.status + '\nDate: ' + payload.applicationDate + '\nPortal: ' + payload.portal;
+    document.getElementById('notionLbl').textContent = 'Added to Notion';
+    document.getElementById('notionOpenBtn').style.display = 'inline-flex';
     document.getElementById('notionResult').style.display = 'block';
-    done('notion', 'Entry ready — copy and paste into Notion.', 'ok');
-  } catch(e) { done('notion', 'Error: '+e.message, 'error'); }
+    done('notion', 'Entry added to your DB Applications!', 'ok');
+  } catch(e) { done('notion', 'Error: ' + e.message, 'error'); }
 }
+
+async function generateNotionEntry() { await addToNotion(); }
 
 async function generateFollowUp() {
   const c = ctx();
