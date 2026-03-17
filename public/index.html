@@ -158,6 +158,7 @@
     <button class="tab" onclick="switchTab(this,'form')">📝 Form answers</button>
     <button class="tab" onclick="switchTab(this,'resume')">✨ Tailor resume</button>
     <button class="tab" onclick="switchTab(this,'notion')">🗂 Notion update</button>
+    <button class="tab" onclick="switchTab(this,'linkedin')">💼 LinkedIn DM</button>
   </div>
 
   <!-- EMAIL -->
@@ -348,6 +349,41 @@
       </div>
     </div>
   </div>
+
+  <!-- LINKEDIN DM -->
+  <div class="panel" id="tab-linkedin">
+    <div class="card">
+      <p class="card-desc">Generate LinkedIn DMs based on your resume and the JD. Short one for connect requests, long one for cold outreach.</p>
+      <div class="grid2">
+        <div>
+          <div class="lbl">Person's name (optional)</div>
+          <input type="text" id="dmRecipientName" placeholder="e.g. Rahul Sharma">
+        </div>
+        <div>
+          <div class="lbl">Their role (optional)</div>
+          <input type="text" id="dmRecipientRole" placeholder="e.g. CTO, HR Manager">
+        </div>
+      </div>
+      <div class="lbl" style="margin-top:10px">Your portfolio link</div>
+      <input type="text" id="portfolioLink" value="https://archimangla.vercel.app" placeholder="https://yourportfolio.com">
+      <div class="lbl" style="margin-top:8px">Your resume link</div>
+      <input type="text" id="resumeLink" placeholder="https://drive.google.com/... or similar">
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn primary" onclick="generateShortDM()">Generate connect request DM ↗</button>
+        <button class="btn" onclick="generateLongDM()">Generate cold outreach DM ↗</button>
+      </div>
+      <div class="prog" id="dmProg"><div class="prog-fill"></div></div>
+      <div class="status" id="dmStatus"></div>
+    </div>
+    <div id="dmResult" style="display:none" class="result-section">
+      <div class="rlbl" id="dmLbl">DM</div>
+      <div class="result-box" id="dmText"></div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="copyEl('dmText')">Copy DM</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -663,6 +699,67 @@ async function generateFollowUp() {
     document.getElementById('notionResult').style.display = 'block';
     done('notion', 'Follow-up ready — copy and send.', 'ok');
   } catch(e) { done('notion', 'Error: '+e.message, 'error'); }
+}
+
+async function generateShortDM() {
+  const c = ctx();
+  if (!c.company || !c.role) { alert('Fill in company and role first.'); return; }
+  setLoading('dm', 'Writing connect request DM...');
+  document.getElementById('dmResult').style.display = 'none';
+  try {
+    const name = document.getElementById('dmRecipientName').value.trim();
+    const role = document.getElementById('dmRecipientRole').value.trim();
+    const portfolio = document.getElementById('portfolioLink').value.trim();
+    const resumeLink = document.getElementById('resumeLink').value.trim();
+    const sys = `You write short LinkedIn connect request notes (max 300 characters — LinkedIn's limit). They must be punchy, personal, and specific. No generic phrases like "I came across your profile". Reference the company and role. Sound like a real human reaching out. End naturally — no sign-off needed.`;
+    const prompt = `Write a LinkedIn connect request note for:
+Recipient: ${name||'the hiring manager/recruiter'} ${role ? '('+role+')' : ''}
+Company: ${c.company}
+Role applying for: ${c.role}
+${portfolio ? 'My portfolio: '+portfolio : ''}
+${resumeLink ? 'My resume: '+resumeLink : ''}
+
+JD context:
+${c.jd ? c.jd.slice(0,400) : '(not provided)'}
+
+Max 300 characters. Be direct and specific.`;
+    const result = await callClaude(sys, prompt);
+    document.getElementById('dmText').textContent = result.trim();
+    document.getElementById('dmLbl').textContent = 'Connect request note (≤300 chars)';
+    document.getElementById('dmResult').style.display = 'block';
+    const len = result.trim().length;
+    done('dm', `${len} characters ${len > 300 ? '⚠️ over limit — regenerate' : '✓ within limit'}.`, len > 300 ? 'error' : 'ok');
+  } catch(e) { done('dm', 'Error: '+e.message, 'error'); }
+}
+
+async function generateLongDM() {
+  const c = ctx();
+  if (!c.company || !c.role) { alert('Fill in company and role first.'); return; }
+  setLoading('dm', 'Writing cold outreach DM...');
+  document.getElementById('dmResult').style.display = 'none';
+  try {
+    const name = document.getElementById('dmRecipientName').value.trim();
+    const role = document.getElementById('dmRecipientRole').value.trim();
+    const portfolio = document.getElementById('portfolioLink').value.trim();
+    const resumeLink = document.getElementById('resumeLink').value.trim();
+    const sys = `You write cold outreach LinkedIn DMs for job applications. These are longer messages sent after connecting or directly. They should: open with a specific hook about the company (not generic praise), briefly introduce the applicant's most relevant background from their resume, connect it to what the company does, and end with a clear but low-pressure ask. Sound like a real person, not a template. No filler. No "I hope this message finds you well".`;
+    const prompt = `Write a cold outreach LinkedIn DM for:
+Recipient: ${name||'the hiring manager/recruiter'} ${role ? '('+role+')' : ''}
+Company: ${c.company}
+Role applying for: ${c.role}
+${portfolio ? 'Portfolio to mention: '+portfolio : ''}
+${resumeLink ? 'Resume link to include: '+resumeLink : ''}
+
+Full JD:
+${c.jd||'(not provided)'}
+
+Write a compelling DM. 150-250 words. Include portfolio and resume links naturally.`;
+    const result = await callClaude(sys, prompt);
+    document.getElementById('dmText').textContent = result.trim();
+    document.getElementById('dmLbl').textContent = 'Cold outreach DM';
+    document.getElementById('dmResult').style.display = 'block';
+    done('dm', 'DM ready — copy and send on LinkedIn.', 'ok');
+  } catch(e) { done('dm', 'Error: '+e.message, 'error'); }
 }
 </script>
 </body>
