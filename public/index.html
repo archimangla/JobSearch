@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Archi's Job Search Assistant</title>
   <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -453,26 +455,44 @@ function ctx() {
   };
 }
 
-function handleUpload(input) {
+async function handleUpload(input) {
   const file = input.files[0]; if (!file) return;
+  const badge = document.getElementById('ctxBadge');
+  badge.textContent = 'reading...'; badge.className = 'badge';
   document.getElementById('rName').textContent = file.name;
   document.getElementById('resumeZone').classList.add('loaded');
-  resumeMediaType = file.name.endsWith('.pdf') ? 'application/pdf'
-    : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  const badge = document.getElementById('ctxBadge');
-  const reader = new FileReader();
-  reader.onload = e => {
-    resumeB64 = e.target.result.split(',')[1];
-    badge.textContent = 'resume loaded'; badge.className = 'badge ok';
-  };
-  reader.readAsDataURL(file);
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    if (file.name.endsWith('.pdf')) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let text = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const c = await page.getTextContent();
+        text += c.items.map(s => s.str).join(' ') + '\n';
+      }
+      resumeText = text.trim();
+    } else {
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      resumeText = result.value.trim();
+    }
+    if (resumeText.length > 50) {
+      badge.textContent = 'resume loaded'; badge.className = 'badge ok';
+    } else {
+      badge.textContent = 'extraction failed'; badge.className = 'badge';
+      alert('Could not read your resume. Try a DOCX file instead of PDF.');
+    }
+  } catch(e) {
+    badge.textContent = 'error'; badge.className = 'badge';
+    alert('Error reading file: ' + e.message);
+  }
 }
 
 async function callClaude(system, userText) {
   const body = {
     system,
-    resumeB64: resumeB64 || '',
-    resumeMediaType: resumeMediaType || '',
+    resumeText: resumeText || '',
     messages: [{ role: 'user', content: typeof userText === 'string' ? userText : userText.filter(b => b.type === 'text').map(b => b.text).join('\n') }]
   };
   const res = await fetch('/api/claude', {
@@ -536,7 +556,7 @@ async function generateFormAnswer() {
 }
 
 async function tailorResume() {
-  if (!resumeB64) { alert('Upload your resume first.'); return; }
+  if (!resumeText) { alert('Please upload your resume first and wait for it to finish loading.'); return; }
   const c = ctx();
   if (!c.jd) { alert('Paste the job description first.'); return; }
   setLoading('resume', 'Reading resume and tailoring to JD...');
