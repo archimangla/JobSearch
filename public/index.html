@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Archi's Job Search Assistant</title>
   <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -351,7 +349,62 @@
 </div>
 
 <script>
-let resumeB64 = '', resumeMediaType = '', resumeText = '', tailoredContent = '';
+let resumeB64 = '', resumeMediaType = '', tailoredContent = '';
+
+// YOUR RESUME — update this whenever your resume changes
+let resumeText = `ARCHI MANGLA
++91 8800928963 | Delhi, India | archimangla6@gmail.com
+linkedin.com/in/archimangla | github.com/archimangla
+
+EDUCATION
+Bachelor of Technology, Computer Science 2023-2027
+Maharaja Agrasen Institute of Technology, GGSIPU
+
+Bachelor of Science, Data Science, Online 2023-2027
+Indian Institute of Technology, Madras
+Strong foundation in data analysis, algorithms, statistics, and computational problem solving
+Coursework and projects involving Python, NumPy, Pandas, and structured data workflows
+
+SKILLS
+Languages: C, C++, Python, SQL, HTML, CSS, JavaScript
+Frameworks: Django, Django REST Framework (DRF), Flask, REST API Design, Celery, API Pagination & Filtering, Rate Limiting, Error Handling, Transactions
+Databases: PostgreSQL, SQLite, Redis (Caching, Rate Limiting, Message Broker)
+Core CS: Backend System Design, Inventory Consistency, Atomic Operations, Concurrency Control, Idempotency, DBMS, OS, DSA, RESTful Architecture
+Data and Analysis: NumPy, Pandas
+Tools, Platforms: Docker, Docker Compose, Git, GitHub, Gunicorn, VS Code, Render, Google Colab, Figma
+
+EXPERIENCE
+Computer Science Intern | Jan 2026 - Feb 2026
+Frauscher Sensor Technology, India | Gurugram, Haryana
+- Built a Python-Flask dashboard integrating Excel (Pandas, OpenPyXL) to manage 100+ live records with automated tracking and 6+ real-time analytics; packaged as a Windows (.exe) application.
+- Automated FAdC configuration and BOM generation using Flask and Excel automation, reduced manual effort by 80%.
+
+PROJECTS
+HealthSync / Python, Flask, SQLite, REST APIs / Sep 2025 - Dec 2025
+Live: https://healthsync-hms.onrender.com
+- Built 15+ role-based backend endpoints improving data consistency by 35%.
+- Designed efficient query patterns, reducing redundant data operations and response latency by 30%.
+
+Hintro Backend System / Python, FastAPI, PostgreSQL / Feb 2026
+Source: https://github.com/archimangla/hintro
+- Engineered 12+ RESTful endpoints with role-based access control improving API response time by 30% under concurrent load.
+- Designed ride-matching and pooling logic, reducing redundant operations by 35%.
+
+Job Search Assistant / Node.js, Vercel Serverless, GPT-4o, Notion API / Mar 2026
+Live: https://jobhuntwitharchi.vercel.app | GitHub: https://github.com/archimangla/JobSearch
+- Built a full-stack AI job search tool with 4 modules: outreach email drafting, form answer generation, JD-tailored resume export (DOCX), and direct Notion DB integration.
+- Engineered Vercel serverless API proxy routing LLM requests via GitHub Models (GPT-4o), securing keys server-side and eliminating CORS issues.
+
+ACHIEVEMENTS AND LEADERSHIP ROLES
+- Mathematics high scores: 98.45 percentile JEE MAINS 2023, 99% Class X Boards, 95% Class XII Boards
+- 1st Runner Up, North India Championship, ICMAS
+- Head of Poetry Department, Literary Umbrella 2025-26
+- Coordinated teams and events as part of Career Development Cell, MAIT
+
+EXTRA CURRICULARS
+- Multiple Poetry Wins at MAMC, IITD, IGDTUW, SRCC, DU circuit
+- Featured in The Hindustan Times and The Unheard Stories Podcast
+- Core Member, Literary Umbrella, MAIT`;
 
 function toggleCtx() {
   const b = document.getElementById('ctxBody');
@@ -455,38 +508,19 @@ function ctx() {
   };
 }
 
-async function handleUpload(input) {
+function handleUpload(input) {
   const file = input.files[0]; if (!file) return;
-  const badge = document.getElementById('ctxBadge');
-  badge.textContent = 'reading...'; badge.className = 'badge';
   document.getElementById('rName').textContent = file.name;
   document.getElementById('resumeZone').classList.add('loaded');
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    if (file.name.endsWith('.pdf')) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      let text = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const c = await page.getTextContent();
-        text += c.items.map(s => s.str).join(' ') + '\n';
-      }
-      resumeText = text.trim();
-    } else {
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      resumeText = result.value.trim();
-    }
-    if (resumeText.length > 50) {
-      badge.textContent = 'resume loaded'; badge.className = 'badge ok';
-    } else {
-      badge.textContent = 'extraction failed'; badge.className = 'badge';
-      alert('Could not read your resume. Try a DOCX file instead of PDF.');
-    }
-  } catch(e) {
-    badge.textContent = 'error'; badge.className = 'badge';
-    alert('Error reading file: ' + e.message);
-  }
+  resumeMediaType = file.name.endsWith('.pdf') ? 'application/pdf'
+    : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const badge = document.getElementById('ctxBadge');
+  const reader = new FileReader();
+  reader.onload = e => {
+    resumeB64 = e.target.result.split(',')[1];
+    badge.textContent = 'resume loaded'; badge.className = 'badge ok';
+  };
+  reader.readAsDataURL(file);
 }
 
 async function callClaude(system, userText) {
@@ -556,7 +590,7 @@ async function generateFormAnswer() {
 }
 
 async function tailorResume() {
-  if (!resumeText) { alert('Please upload your resume first and wait for it to finish loading.'); return; }
+  if (!resumeB64) { alert('Please upload your resume file first (for tailoring).'); return; }
   const c = ctx();
   if (!c.jd) { alert('Paste the job description first.'); return; }
   setLoading('resume', 'Reading resume and tailoring to JD...');
