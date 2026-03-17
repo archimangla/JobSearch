@@ -524,8 +524,8 @@ async function generateFormAnswer() {
   try {
     const wl = document.getElementById('wordLimit').value.trim();
     const tone = document.getElementById('formTone').value;
-    const sys = `You write ${tone} answers to job application form questions for Archi Mangla — CS student at IIT Madras BS program (transitioning to diploma), recently completed CS internship at Frauscher Sensor Technology (Feb 2026). Background: Python, Flask, Django, React, C++, ML pipelines, Pandas, UI/UX, Figma, railway signaling dashboards, competitive programming (LeetCode). Interests: poetry, public speaking, combining tech with social impact. Sound genuine and specific. Never use "I am passionate about" or "I have always been interested in" or similar filler.`;
-    const prompt = `Company: ${c.company||'this company'}\nRole: ${c.role||'this role'}\n${c.jd ? 'JD context:\n'+c.jd.slice(0,500) : ''}\n${wl ? 'Word limit: '+wl : ''}\n\nQuestion: ${question}\n\nWrite the answer now.`;
+    const sys = `You write ${tone} answers to job application form questions. Use the applicant's uploaded resume as the SOLE source of truth for their background, projects, and skills. Also read the full JD to understand what this company values and tailor the answer to match. Draw concrete examples from actual projects in the resume. Never use filler phrases like "I am passionate about" or "I have always been interested in". Sound like a real human, not a template.`;
+    const prompt = `Company: ${c.company||'this company'}\nRole: ${c.role||'this role'}\n${wl ? 'Word limit: '+wl : ''}\n\nFULL JOB DESCRIPTION:\n${c.jd||'(not provided)'}\n\nForm question: ${question}\n\nWrite a tailored answer grounded in the resume and JD above.`;
     const result = await callClaudeWithResume(sys, prompt);
     document.getElementById('formAnswer').textContent = result.trim();
     document.getElementById('formResult').style.display = 'block';
