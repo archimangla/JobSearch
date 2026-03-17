@@ -52,10 +52,10 @@ export default async function handler(req, res) {
 
     // Step 2: Build system prompt — resume + JD as the only context
     const resumeBlock = resumeText
-      ? `=== RESUME (source of truth) ===\n${resumeText}\n=== END RESUME ===`
-      : '=== NO RESUME UPLOADED — ask user to upload their resume ===';
+      ? `=== RESUME (ONLY source of truth — do not go beyond this) ===\n${resumeText}\n=== END RESUME ===`
+      : '=== NO RESUME UPLOADED ===\nTell the user: "Please upload your resume first so I can give accurate, grounded answers."';
 
-    const enrichedSystem = `${resumeBlock}\n\nINSTRUCTIONS:\n- Use ONLY the resume above as the source of truth for the applicant's background, education, experience, projects, and skills.\n- When the question/task is about projects specifically, focus on the PROJECTS section of the resume only. Do NOT default to the internship/experience section unless the question explicitly asks about work experience.\n- When the question/task is about experience or work, use the EXPERIENCE section.\n- Always tailor outputs to the job description provided in the user message.\n- Never invent, assume, or hallucinate any detail not present in the resume.\n- Sound like a real human — specific, grounded, no filler phrases like "I am passionate about" or "I have always been interested in".\n- Portfolio: https://archimangla.vercel.app | GitHub: https://github.com/archimangla | LinkedIn: https://linkedin.com/in/archimangla — mention naturally when relevant.\n\n${system || ''}`;
+    const enrichedSystem = `${resumeBlock}\n\nCRITICAL RULES — FOLLOW EXACTLY:\n1. NEVER mention any project, skill, technology, company, or experience that is NOT explicitly written in the resume above. If it is not in the resume, it does not exist.\n2. If asked about projects, use ONLY the project names and details from the PROJECTS section of the resume. Do not invent project names.\n3. If asked about experience, use ONLY the EXPERIENCE section of the resume.\n4. If the resume does not have enough information to answer, say so honestly — do NOT fill gaps with invented content.\n5. No filler phrases: never say "I am passionate about", "I have always been interested in", "I am excited to", or similar.\n6. Sound like a real human. Be specific. Reference exact project names, numbers, and technologies from the resume.\n7. Portfolio: https://archimangla.vercel.app | GitHub: https://github.com/archimangla | LinkedIn: https://linkedin.com/in/archimangla — mention naturally when relevant.\n\nVIOLATING RULE 1 OR 2 IS A CRITICAL FAILURE. DO NOT HALLUCINATE.\n\n${system || ''}`;
 
     openaiMessages.push({ role: 'system', content: enrichedSystem });
 
