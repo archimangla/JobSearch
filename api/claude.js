@@ -11,17 +11,14 @@ export default async function handler(req, res) {
 
   try {
     const { system, messages, max_tokens } = req.body;
-
-    // Build OpenAI messages
     const openaiMessages = [];
 
-    // Extract resume text from document blocks if present
+    // Step 1: Extract resume text from uploaded document
     let resumeText = '';
     for (const msg of messages) {
       if (Array.isArray(msg.content)) {
         for (const block of msg.content) {
           if (block.type === 'document' && block.source?.data) {
-            // Send resume to GPT-4o for extraction first
             const extractRes = await fetch('https://models.inference.ai.azure.com/chat/completions', {
               method: 'POST',
               headers: {
@@ -30,24 +27,20 @@ export default async function handler(req, res) {
               },
               body: JSON.stringify({
                 model: 'gpt-4o',
-                max_tokens: 1000,
-                messages: [
-                  {
-                    role: 'user',
-                    content: [
-                      {
-                        type: 'image_url',
-                        image_url: {
-                          url: `data:${block.source.media_type};base64,${block.source.data}`
-                        }
-                      },
-                      {
-                        type: 'text',
-                        text: 'Extract all text from this resume exactly as written. Return only the raw text content, no commentary.'
-                      }
-                    ]
-                  }
-                ]
+                max_tokens: 1500,
+                messages: [{
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'image_url',
+                      image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` }
+                    },
+                    {
+                      type: 'text',
+                      text: 'Extract ALL text from this resume exactly as written. Preserve section names (EDUCATION, EXPERIENCE, PROJECTS, SKILLS, etc.) and their content. Return only the raw resume text, no commentary.'
+                    }
+                  ]
+                }]
               })
             });
             const extractData = await extractRes.json();
@@ -57,21 +50,16 @@ export default async function handler(req, res) {
       }
     }
 
-    // Build system prompt — use extracted resume if available, else fallback
-    const fallbackProfile = `Applicant: Archi Mangla
-Education: B.Tech CSE — MAIT GGSIPU (2023–2027) | BS Data Science — IIT Madras (2023–2027)
-Experience: CS Intern at Frauscher Sensor Technology (Jan–Feb 2026)
-Skills: Python, Flask, Django, FastAPI, PostgreSQL, Redis, Docker, JS, C++, Pandas, NumPy, Figma`;
+    // Step 2: Build system prompt — resume + JD as the only context
+    const resumeBlock = resumeText
+      ? `=== RESUME (source of truth) ===\n${resumeText}\n=== END RESUME ===`
+      : '=== NO RESUME UPLOADED — ask user to upload their resume ===';
 
-    const profileContext = resumeText
-      ? `APPLICANT RESUME (use this as the source of truth for all outputs):\n${resumeText}`
-      : `APPLICANT PROFILE (fallback):\n${fallbackProfile}`;
-
-    const enrichedSystem = profileContext + '\n\n' + (system || '');
+    const enrichedSystem = `${resumeBlock}\n\nINSTRUCTIONS:\n- Use ONLY the resume above as the source of truth for the applicant's background, education, experience, projects, and skills.\n- When the question/task is about projects specifically, focus on the PROJECTS section of the resume only. Do NOT default to the internship/experience section unless the question explicitly asks about work experience.\n- When the question/task is about experience or work, use the EXPERIENCE section.\n- Always tailor outputs to the job description provided in the user message.\n- Never invent, assume, or hallucinate any detail not present in the resume.\n- Sound like a real human — specific, grounded, no filler phrases like "I am passionate about" or "I have always been interested in".\n- Portfolio: https://archimangla.vercel.app | GitHub: https://github.com/archimangla | LinkedIn: https://linkedin.com/in/archimangla — mention naturally when relevant.\n\n${system || ''}`;
 
     openaiMessages.push({ role: 'system', content: enrichedSystem });
 
-    // Add remaining messages (text only, skip document blocks)
+    // Step 3: Add user messages (text only, skip document blocks)
     for (const msg of messages) {
       if (Array.isArray(msg.content)) {
         const textParts = msg.content
@@ -84,6 +72,7 @@ Skills: Python, Flask, Django, FastAPI, PostgreSQL, Redis, Docker, JS, C++, Pand
       }
     }
 
+    // Step 4: Call GPT-4o
     const response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
       method: 'POST',
       headers: {
