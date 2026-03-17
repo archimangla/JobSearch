@@ -722,13 +722,13 @@ ${resumeLink ? 'My resume: '+resumeLink : ''}
 JD context:
 ${c.jd ? c.jd.slice(0,400) : '(not provided)'}
 
-Max 300 characters. Be direct and specific.`;
+Max 200 characters. Be direct and specific.`;
     const result = await callClaude(sys, prompt);
     document.getElementById('dmText').textContent = result.trim();
-    document.getElementById('dmLbl').textContent = 'Connect request note (≤300 chars)';
+    document.getElementById('dmLbl').textContent = 'Connect request note (≤200 chars)';
     document.getElementById('dmResult').style.display = 'block';
     const len = result.trim().length;
-    done('dm', `${len} characters ${len > 300 ? '⚠️ over limit — regenerate' : '✓ within limit'}.`, len > 300 ? 'error' : 'ok');
+    done('dm', `${len} characters ${len > 200 ? '⚠️ over limit — regenerate' : '✓ within limit'}.`, len > 200 ? 'error' : 'ok');
   } catch(e) { done('dm', 'Error: '+e.message, 'error'); }
 }
 
