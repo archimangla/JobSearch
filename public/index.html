@@ -334,6 +334,8 @@
       </div>
       <div class="lbl">Notes</div>
       <textarea id="appNotes" rows="2" placeholder="Anything worth tracking..."></textarea>
+      <div class="lbl" style="margin-top:12px">Previous email sent (paste for follow-up)</div>
+      <textarea id="previousEmail" rows="4" placeholder="Paste the email you previously sent here — the follow-up will reference it naturally..."></textarea>
       <div class="btn-row">
         <button class="btn primary" onclick="addToNotion()">➕ Add to Notion DB ↗</button>
         <button class="btn" onclick="generateFollowUp()">Generate follow-up email ↗</button>
@@ -691,8 +693,9 @@ async function generateFollowUp() {
   document.getElementById('notionResult').style.display = 'none';
   try {
     const email = document.getElementById('recruiterEmail').value.trim();
-    const sys = `Write brief, professional follow-up emails for job applications. From Archi Mangla, CS student at IIT Madras BS program + recently completed CS internship at Frauscher Sensor Technology (Feb 2026). Under 120 words. Warm but not desperate. No filler.`;
-    const prompt = `Company: ${c.company}\nRole: ${c.role}\n${email?'To: '+email:''}\nApplied ~5 days ago. Reiterate interest, politely ask for a status update.`;
+    const prevEmail = document.getElementById('previousEmail').value.trim();
+    const sys = `Write brief, professional follow-up emails for job applications. Under 120 words. Warm but not desperate. No filler phrases. If a previous email is provided, reference it naturally (e.g. "following up on my email from last week") and maintain consistency in tone and content. Do not repeat the same points verbatim — acknowledge them briefly and add a fresh nudge.`;
+    const prompt = `Company: ${c.company}\nRole: ${c.role}\n${email ? 'Recipient email: '+email : ''}\n${prevEmail ? '\nPrevious email sent:\n'+prevEmail : '\nNo previous email provided — write a general follow-up.'}\n\nWrite the follow-up now.`;
     const result = await callClaude(sys, prompt);
     document.getElementById('notionEntry').textContent = result.trim();
     document.getElementById('notionLbl').textContent = 'Follow-up email';
