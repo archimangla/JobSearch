@@ -10,69 +10,41 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).json({ error: { message: 'GITHUB_API_KEY not set' } });
 
   try {
-    const { system, messages, max_tokens } = req.body;
+    const { system, messages, max_tokens, resumeText } = req.body;
     const openaiMessages = [];
 
-    // Step 1: Extract resume text from uploaded document
-    let resumeText = '';
-    for (const msg of messages) {
-      if (Array.isArray(msg.content)) {
-        for (const block of msg.content) {
-          if (block.type === 'document' && block.source?.data) {
-            const extractRes = await fetch('https://models.inference.ai.azure.com/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-              },
-              body: JSON.stringify({
-                model: 'gpt-4o',
-                max_tokens: 1500,
-                messages: [{
-                  role: 'user',
-                  content: [
-                    {
-                      type: 'image_url',
-                      image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` }
-                    },
-                    {
-                      type: 'text',
-                      text: 'Extract ALL text from this resume exactly as written. Preserve section names (EDUCATION, EXPERIENCE, PROJECTS, SKILLS, etc.) and their content. Return only the raw resume text, no commentary.'
-                    }
-                  ]
-                }]
-              })
-            });
-            const extractData = await extractRes.json();
-            resumeText = extractData.choices?.[0]?.message?.content || '';
-          }
-        }
-      }
-    }
+    // resumeText is now sent directly as plain text from the client
+    const resumeBlock = resumeText && resumeText.length > 50
+      ? `=== RESUME (only source of truth) ===\n${resumeText}\n=== END RESUME ===`
+      : '=== NO RESUME TEXT PROVIDED — tell user to upload their resume ===';
 
-    // Step 2: Build system prompt — resume + JD as the only context
-    const resumeBlock = resumeText
-      ? `=== RESUME (ONLY source of truth — do not go beyond this) ===\n${resumeText}\n=== END RESUME ===`
-      : '=== NO RESUME UPLOADED ===\nTell the user: "Please upload your resume first so I can give accurate, grounded answers."';
+    const enrichedSystem = `${resumeBlock}
 
-    const enrichedSystem = `${resumeBlock}\n\nCRITICAL RULES — FOLLOW EXACTLY:\n1. NEVER mention any project, skill, technology, company, or experience that is NOT explicitly written in the resume above. If it is not in the resume, it does not exist.\n2. If asked about projects, use ONLY the project names and details from the PROJECTS section of the resume. Do not invent project names.\n3. If asked about experience, use ONLY the EXPERIENCE section of the resume.\n4. If the resume does not have enough information to answer, say so honestly — do NOT fill gaps with invented content.\n5. No filler phrases: never say "I am passionate about", "I have always been interested in", "I am excited to", or similar.\n6. Sound like a real human. Be specific. Reference exact project names, numbers, and technologies from the resume.\n7. Portfolio: https://archimangla.vercel.app | GitHub: https://github.com/archimangla | LinkedIn: https://linkedin.com/in/archimangla — mention naturally when relevant.\n\nVIOLATING RULE 1 OR 2 IS A CRITICAL FAILURE. DO NOT HALLUCINATE.\n\n${system || ''}`;
+CRITICAL RULES — NEVER VIOLATE:
+1. ONLY use information explicitly written in the resume above. Never mention any project, technology, company, or experience not in the resume.
+2. If asked about PROJECTS → use ONLY the PROJECTS section. Never substitute internship/experience.
+3. If asked about EXPERIENCE → use ONLY the EXPERIENCE section.
+4. If a detail is not in the resume, say so — never invent or assume anything.
+5. Never use filler: no "I am passionate about", "I have always been interested in", "I am excited to".
+6. Be specific. Reference exact project names, numbers, and technologies from the resume.
+7. Portfolio: https://archimangla.vercel.app | GitHub: https://github.com/archimangla | LinkedIn: https://linkedin.com/in/archimangla — mention naturally when relevant.
+
+VIOLATING RULE 1 IS A CRITICAL FAILURE. DO NOT HALLUCINATE.
+
+${system || ''}`;
 
     openaiMessages.push({ role: 'system', content: enrichedSystem });
 
-    // Step 3: Add user messages (text only, skip document blocks)
+    // Add user messages as plain text only
     for (const msg of messages) {
       if (Array.isArray(msg.content)) {
-        const textParts = msg.content
-          .filter(b => b.type === 'text')
-          .map(b => b.text)
-          .join('\n');
+        const textParts = msg.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
         if (textParts) openaiMessages.push({ role: msg.role, content: textParts });
       } else {
         openaiMessages.push({ role: msg.role, content: msg.content });
       }
     }
 
-    // Step 4: Call GPT-4o
     const response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
       method: 'POST',
       headers: {
