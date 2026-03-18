@@ -179,6 +179,8 @@
           </select>
         </div>
       </div>
+      <div class="lbl" style="margin-top:10px">Special instructions (optional)</div>
+      <textarea id="emailInstructions" rows="2" placeholder="e.g. Mention my open source work, keep it under 150 words, reference their recent product launch..."></textarea>
       <div class="btn-row">
         <button class="btn primary" onclick="generateEmail()">Generate email ↗</button>
         <button class="btn" onclick="findRecruiters()">🔍 Find recruiters on LinkedIn</button>
@@ -218,6 +220,8 @@
           </select>
         </div>
       </div>
+      <div class="lbl" style="margin-top:10px">Special instructions (optional)</div>
+      <textarea id="formInstructions" rows="2" placeholder="e.g. Keep it under 100 words, mention HealthSync specifically, sound more casual..."></textarea>
       <div class="btn-row"><button class="btn primary" onclick="generateFormAnswer()">Generate answer ↗</button></div>
       <div class="prog" id="formProg"><div class="prog-fill"></div></div>
       <div class="status" id="formStatus"></div>
@@ -331,6 +335,31 @@
           <div class="lbl">Salary (₹)</div>
           <input type="number" id="appSalary" placeholder="e.g. 25000">
         </div>
+        <div class="fgroup">
+          <div class="lbl">Duration</div>
+          <input type="text" id="appDuration" placeholder="e.g. 3 months, 6 months">
+        </div>
+        <div class="fgroup">
+          <div class="lbl">Joining</div>
+          <input type="text" id="appJoining" placeholder="e.g. Immediate, June 2026">
+        </div>
+        <div class="fgroup">
+          <div class="lbl">Working days/hrs</div>
+          <input type="text" id="appWorkingDays" placeholder="e.g. 5 days, 40hrs/week">
+        </div>
+        <div class="fgroup">
+          <div class="lbl">Compensation type</div>
+          <input type="text" id="appCompType" placeholder="e.g. Stipend, Full-time salary">
+        </div>
+        <div class="fgroup">
+          <div class="lbl">Assignment</div>
+          <select id="appAssignment">
+            <option value="">None</option>
+            <option value="Received">Received</option>
+            <option value="Submitted">Submitted</option>
+            <option value="Reverted">Reverted</option>
+          </select>
+        </div>
       </div>
       <div class="lbl">Notes</div>
       <textarea id="appNotes" rows="2" placeholder="Anything worth tracking..."></textarea>
@@ -370,7 +399,9 @@
       <input type="text" id="portfolioLink" value="https://archimangla.vercel.app" placeholder="https://yourportfolio.com">
       <div class="lbl" style="margin-top:8px">Your resume link</div>
       <input type="text" id="resumeLink" placeholder="https://drive.google.com/... or similar">
-      <div class="btn-row" style="margin-top:14px">
+      <div class="lbl" style="margin-top:10px">Special instructions (optional)</div>
+      <textarea id="dmInstructions" rows="2" placeholder="e.g. Mention my IIT Madras degree, reference their latest funding round, keep it very casual..."></textarea>
+      <div class="btn-row" style="margin-top:10px">
         <button class="btn primary" onclick="generateShortDM()">Generate connect request DM ↗</button>
         <button class="btn" onclick="generateLongDM()">Generate cold outreach DM ↗</button>
       </div>
@@ -559,8 +590,9 @@ async function generateEmail() {
   try {
     const tone = document.getElementById('emailTone').value;
     const recipient = document.getElementById('recipientName').value.trim();
+    const emailInstructions = document.getElementById('emailInstructions').value.trim();
     const sys = `You draft ${tone} cold outreach emails for job/internship applications. The applicant is Archi Mangla — CS student at IIT Madras (BS program, transitioning to diploma phase) who recently completed a CS internship at Frauscher Sensor Technology (completed Feb 2026). Skills: Python, Flask, Django, React, C++, ML, Pandas, UI/UX, Figma. Always mention both the IIT Madras BS degree and the recently completed internship. Keep under 200 words. No filler phrases like "I am passionate about". End with a clear CTA. Return EXACTLY:\nSUBJECT: [subject line]\nBODY:\n[email body]`;
-    const prompt = `Company: ${c.company}\nRole: ${c.role}\n${recipient ? 'Recipient: '+recipient : ''}\n${c.jd ? 'JD (first 600 chars):\n'+c.jd.slice(0,600) : ''}\n\nDraft the outreach email now.`;
+    const prompt = `Company: ${c.company}\nRole: ${c.role}\n${recipient ? 'Recipient: '+recipient : ''}\n${c.jd ? 'JD (first 600 chars):\n'+c.jd.slice(0,600) : ''}\n${emailInstructions ? 'SPECIAL INSTRUCTIONS: '+emailInstructions : ''}\n\nDraft the outreach email now.`;
     const result = await callClaudeWithResume(sys, prompt);
     const subMatch = result.match(/SUBJECT:\s*(.+)/);
     const bodyMatch = result.match(/BODY:\s*([\s\S]+)/);
@@ -579,6 +611,7 @@ async function generateFormAnswer() {
   document.getElementById('formResult').style.display = 'none';
   try {
     const wl = document.getElementById('wordLimit').value.trim();
+    const formInstructions = document.getElementById('formInstructions').value.trim();
     const tone = document.getElementById('formTone').value;
     const sys = `You write ${tone} answers to job application form questions. Use the applicant's uploaded resume as the SOLE source of truth for their background, projects, and skills. Also read the full JD to understand what this company values and tailor the answer to match. Draw concrete examples from actual projects in the resume. Never use filler phrases like "I am passionate about" or "I have always been interested in". Sound like a real human, not a template.`;
     // Detect if question is about projects specifically
@@ -586,7 +619,7 @@ async function generateFormAnswer() {
     const sectionHint = isAboutProjects
       ? 'IMPORTANT: Focus ONLY on the PROJECTS section of the resume. Do NOT mention the internship/experience section unless the question explicitly asks about work experience. Pick the most relevant project(s) to the JD.'
       : 'Draw from the most relevant parts of the resume that match the question.';
-    const prompt = `Company: ${c.company||'this company'}\nRole: ${c.role||'this role'}\n${wl ? 'Word limit: '+wl : ''}\n\n${sectionHint}\n\nFULL JOB DESCRIPTION:\n${c.jd||'(not provided)'}\n\nForm question: ${question}\n\nWrite a tailored, specific answer. If the question is about projects, only reference projects from the Projects section of the resume — not internship work.`;
+    const prompt = `Company: ${c.company||'this company'}\nRole: ${c.role||'this role'}\n${wl ? 'Word limit: '+wl : ''}\n${formInstructions ? 'SPECIAL INSTRUCTIONS: '+formInstructions : ''}\n\n${sectionHint}\n\nFULL JOB DESCRIPTION:\n${c.jd||'(not provided)'}\n\nForm question: ${question}\n\nWrite a tailored, specific answer. If the question is about projects, only reference projects from the Projects section of the resume — not internship work.`;
     const result = await callClaudeWithResume(sys, prompt);
     document.getElementById('formAnswer').textContent = result.trim();
     document.getElementById('formResult').style.display = 'block';
@@ -667,6 +700,16 @@ async function addToNotion() {
       location: document.getElementById('appLocation').value,
       salary: document.getElementById('appSalary').value || null,
       notes: document.getElementById('appNotes').value,
+      duration: document.getElementById('appDuration').value.trim(),
+      joining: document.getElementById('appJoining').value.trim(),
+      workingDays: document.getElementById('appWorkingDays').value.trim(),
+      compensationType: document.getElementById('appCompType').value.trim(),
+      assignment: document.getElementById('appAssignment').value,
+      duration: document.getElementById('appDuration').value.trim(),
+      joining: document.getElementById('appJoining').value.trim(),
+      workingDays: document.getElementById('appWorkingDays').value.trim(),
+      compensationType: document.getElementById('appCompType').value.trim(),
+      assignment: document.getElementById('appAssignment').value,
     };
     const res = await fetch('/api/notion', {
       method: 'POST',
@@ -711,6 +754,10 @@ async function generateShortDM() {
   document.getElementById('dmResult').style.display = 'none';
   try {
     const name = document.getElementById('dmRecipientName').value.trim();
+    const dmInstructions2 = document.getElementById('dmInstructions').value.trim();
+    const extraDmInstructions2 = dmInstructions2 ? `\nSPECIAL INSTRUCTIONS: \${dmInstructions2}` : '';
+    const dmInstructions = document.getElementById('dmInstructions').value.trim();
+    const extraDmInstructions = dmInstructions ? `\nSPECIAL INSTRUCTIONS: \${dmInstructions}` : '';
     const role = document.getElementById('dmRecipientRole').value.trim();
     const portfolio = document.getElementById('portfolioLink').value.trim();
     const resumeLink = document.getElementById('resumeLink').value.trim();
@@ -725,7 +772,7 @@ ${resumeLink ? 'My resume: '+resumeLink : ''}
 JD context:
 ${c.jd ? c.jd.slice(0,400) : '(not provided)'}
 
-Max 200 characters. Be direct and specific.`;
+Max 200 characters. Be direct and specific.\${extraDmInstructions}\`;
     const result = await callClaude(sys, prompt);
     document.getElementById('dmText').textContent = result.trim();
     document.getElementById('dmLbl').textContent = 'Connect request note (≤200 chars)';
@@ -742,6 +789,8 @@ async function generateLongDM() {
   document.getElementById('dmResult').style.display = 'none';
   try {
     const name = document.getElementById('dmRecipientName').value.trim();
+    const dmInstructions2 = document.getElementById('dmInstructions').value.trim();
+    const extraDmInstructions2 = dmInstructions2 ? `\nSPECIAL INSTRUCTIONS: \${dmInstructions2}` : '';
     const role = document.getElementById('dmRecipientRole').value.trim();
     const portfolio = document.getElementById('portfolioLink').value.trim();
     const resumeLink = document.getElementById('resumeLink').value.trim();
@@ -756,7 +805,7 @@ ${resumeLink ? 'Resume link to include: '+resumeLink : ''}
 Full JD:
 ${c.jd||'(not provided)'}
 
-Write a compelling DM. 150-250 words. Include portfolio and resume links naturally.`;
+Write a compelling DM. 150-250 words. Include portfolio and resume links naturally.\${extraDmInstructions2}\`;
     const result = await callClaude(sys, prompt);
     document.getElementById('dmText').textContent = result.trim();
     document.getElementById('dmLbl').textContent = 'Cold outreach DM';

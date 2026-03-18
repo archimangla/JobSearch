@@ -5,17 +5,16 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const notionKey = process.env.NOTION_API_KEY;
-
-  if (req.method === 'GET') {
-    return res.status(200).json({ hasKey: !!notionKey, keyPrefix: notionKey ? notionKey.slice(0,7) : 'none' });
-  }
-
+  if (req.method === 'GET') return res.status(200).json({ hasKey: !!notionKey, keyPrefix: notionKey ? notionKey.slice(0,7) : 'none' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!notionKey) return res.status(500).json({ error: 'NOTION_API_KEY not set' });
 
-  const { company, position, status, portal, applicationDate, location, mode, coldReachOut, nextAction, salary, notes } = req.body;
+  const {
+    company, position, status, portal, applicationDate,
+    location, mode, coldReachOut, nextAction, salary, notes,
+    duration, joining, workingDays, compensationType, assignment
+  } = req.body;
 
-  // Database ID from the Notion URL (no dashes)
   const DATABASE_ID = '306060c454a1816984e1f93591ca809d';
 
   const properties = {
@@ -29,6 +28,11 @@ export default async function handler(req, res) {
     ...(coldReachOut ? { 'Cold Reach Out': { select: { name: coldReachOut } } } : {}),
     ...(nextAction ? { 'Next Action': { multi_select: [{ name: nextAction }] } } : {}),
     ...(salary ? { Salary: { number: parseFloat(salary) } } : {}),
+    ...(duration ? { Duration: { rich_text: [{ text: { content: duration } }] } } : {}),
+    ...(joining ? { Joining: { rich_text: [{ text: { content: joining } }] } } : {}),
+    ...(workingDays ? { 'working days/hrs': { rich_text: [{ text: { content: workingDays } }] } } : {}),
+    ...(compensationType ? { 'compensation type': { rich_text: [{ text: { content: compensationType } }] } } : {}),
+    ...(assignment ? { Assignment: { select: { name: assignment } } } : {}),
   };
 
   try {
@@ -49,7 +53,7 @@ export default async function handler(req, res) {
     const text = await response.text();
     let data;
     try { data = JSON.parse(text); }
-    catch (e) { return res.status(500).json({ error: 'Notion returned non-JSON: ' + text.slice(0, 300) }); }
+    catch (e) { return res.status(500).json({ error: 'Notion returned non-JSON: ' + text.slice(0, 200) }); }
 
     if (!response.ok) return res.status(response.status).json({ error: data.message || JSON.stringify(data) });
     return res.status(200).json({ success: true, url: data.url, id: data.id });
