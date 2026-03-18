@@ -289,6 +289,10 @@
       <div class="result-box" id="notionEntry"></div>
       <div class="btn-row">
         <button class="btn" id="notionOpenBtn" style="display:none" onclick="window.open(window._notionUrl,'_blank')">Open in Notion ↗</button>
+        <div id="notionFollowUpBtns" style="display:none;gap:8px;flex-wrap:wrap;">
+          <button class="btn primary" onclick="openFollowUpInGmail()">📨 Open in Gmail</button>
+          <button class="btn" onclick="copyEl('notionEntry')">Copy email</button>
+        </div>
       </div>
     </div>
   </div>
@@ -605,6 +609,7 @@ async function addToNotion() {
     document.getElementById('notionEntry').textContent = '✅ Added!\n\nCompany: ' + c.company + '\nPosition: ' + (c.role||'—') + '\nStatus: ' + payload.status + '\nDate: ' + payload.applicationDate + '\nPortal: ' + payload.portal;
     document.getElementById('notionLbl').textContent = 'Added to Notion';
     document.getElementById('notionOpenBtn').style.display = 'inline-flex';
+    document.getElementById('notionFollowUpBtns').style.display = 'none';
     document.getElementById('notionResult').style.display = 'block';
     done('notion', 'Entry added to DB Applications!', 'ok');
   } catch(e) { done('notion', 'Error: ' + e.message, 'error'); }
@@ -623,9 +628,23 @@ async function generateFollowUp() {
     const result = await callClaude(sys, prompt);
     document.getElementById('notionEntry').textContent = result.trim();
     document.getElementById('notionLbl').textContent = 'Follow-up email';
+    document.getElementById('notionOpenBtn').style.display = 'none';
+    document.getElementById('notionFollowUpBtns').style.display = 'flex';
     document.getElementById('notionResult').style.display = 'block';
-    done('notion', 'Follow-up ready — copy and send.', 'ok');
+    done('notion', 'Follow-up ready — copy or open in Gmail.', 'ok');
   } catch(e) { done('notion', 'Error: '+e.message, 'error'); }
+}
+
+function openFollowUpInGmail() {
+  const c = ctx();
+  const body = document.getElementById('notionEntry').textContent;
+  const email = document.getElementById('recruiterEmail') ? document.getElementById('recruiterEmail').value.trim() : '';
+  const subject = encodeURIComponent('Following up — ' + (c.role||'Role') + ' at ' + (c.company||'Company'));
+  const url = 'https://mail.google.com/mail/?view=cm&fs=1'
+    + (email ? '&to=' + encodeURIComponent(email) : '')
+    + '&su=' + subject
+    + '&body=' + encodeURIComponent(body);
+  window.open(url, '_blank');
 }
 
 async function generateShortDM() {
