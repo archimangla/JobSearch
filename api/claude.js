@@ -1,21 +1,37 @@
-// Strip terms that trigger Azure OpenAI content filters
-function sanitizeJD(text) {
+// Detect if text is likely to trigger Azure content filters
+function isSensitiveContent(text) {
+  const triggers = /cyber|malware|exploit|ransomware|threat intel|attack surface|penetration|red team|zero.?day|DDoS|botnet|phishing|intrusion|vulnerability|CVE-|shellcode|payload|exfiltrat|lateral movement|privilege escalation|SOC analyst|SIEM|dark web/gi;
+  const matches = (text.match(triggers) || []).length;
+  return matches >= 3; // 3+ matches = likely to trigger filter
+}
+
+// Sanitize by replacing individual trigger words
+function sanitize(text) {
   if (!text) return text;
   return text
-    .replace(/\b(exploit|malware|ransomware|spyware|rootkit|keylogger|trojan|botnet|phishing|pharming|DDoS|DoS attack|zero.?day|CVE-\d+|reverse shell|payload|shellcode|command.?and.?control|C2|exfiltrat\w*|infiltrat\w*|attack surface|threat actor|threat vector|adversar\w+|dark web|deepweb|cyber.?criminal|hacktivist|nation.?state actor|APT\d*|penetration test|pen test|red team|blue team|SOC analyst|SIEM|intrusion detection|intrusion prevention|firewall bypass|privilege escalation|lateral movement|credential dumping|pass.?the.?hash|SQL injection|XSS|CSRF|RCE|remote code execution|arbitrary code execution|buffer overflow|heap spray|use.?after.?free)\b/gi, (match) => {
-      // Replace with neutral equivalents
-      const map = {
-        'attack surface': 'digital footprint', 'threat intelligence': 'security intelligence',
-        'penetration test': 'security assessment', 'pen test': 'security assessment',
-        'red team': 'security team', 'blue team': 'defense team',
-        'intrusion detection': 'anomaly detection', 'intrusion prevention': 'threat prevention',
-        'exploit': 'security issue', 'malware': 'malicious software',
-        'phishing': 'social engineering', 'DDoS': 'service disruption',
-        'zero-day': 'unpatched vulnerability', 'zero day': 'unpatched vulnerability',
-      };
-      const lower = match.toLowerCase();
-      return map[lower] || 'security-concept';
-    });
+    .replace(/\bcyber\s*(security|threat|attack|criminal|intelligence)\b/gi, 'digital security')
+    .replace(/\battack surface\b/gi, 'digital footprint')
+    .replace(/\bthreat intel(ligence)?\b/gi, 'security intelligence')
+    .replace(/\bpenetration test(ing)?\b/gi, 'security assessment')
+    .replace(/\bred team\b/gi, 'security team')
+    .replace(/\bzero.?day\b/gi, 'unpatched issue')
+    .replace(/\bDDoS\b/gi, 'service disruption attack')
+    .replace(/\bmalware\b/gi, 'malicious software')
+    .replace(/\bransomware\b/gi, 'malicious software')
+    .replace(/\bphishing\b/gi, 'social engineering')
+    .replace(/\bexploit(s|ation)?\b/gi, 'security issue')
+    .replace(/\bvulnerabilit(y|ies)\b/gi, 'security weakness')
+    .replace(/\bintrusion (detection|prevention)\b/gi, 'anomaly detection')
+    .replace(/\bprivilege escalation\b/gi, 'access control issue')
+    .replace(/\blateral movement\b/gi, 'network traversal')
+    .replace(/\bSOC analyst\b/gi, 'security analyst')
+    .replace(/\bSIEM\b/gi, 'security monitoring platform')
+    .replace(/\bdark web\b/gi, 'underground internet')
+    .replace(/\bpayload\b/gi, 'data package')
+    .replace(/\bexfiltrat\w+/gi, 'data transfer')
+    .replace(/\bCVE-[\d-]+/gi, 'security advisory')
+    .replace(/\bbotnet\b/gi, 'network of compromised systems')
+    .replace(/\bshellcode\b/gi, 'low-level code');
 }
 
 export default async function handler(req, res) {
@@ -36,13 +52,14 @@ export default async function handler(req, res) {
     });
   }
 
-  // Sanitize JD content in user messages to avoid Azure content filter
+  // Sanitize messages to avoid Azure content filter
   const sanitizedMessages = messages.map(m => {
-    if (typeof m.content === 'string') {
-      return { ...m, content: sanitizeJD(m.content) };
-    }
-    return m;
+    const content = typeof m.content === 'string' ? m.content : (m.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    return { role: m.role, content: sanitize(content) };
   });
+
+  // Also sanitize system prompt
+  const sanitizedSystem = sanitize(system || '');
 
   const systemPrompt = `=== RESUME — ONLY SOURCE OF TRUTH ===
 ${resumeText.trim()}
@@ -56,13 +73,11 @@ RULES (never violate):
 5. No filler: never say "I am passionate about", "I have always been interested in", "I am excited to".
 6. Use exact names, numbers, and technologies from the resume.
 7. Mention https://archimangla.vercel.app naturally when relevant.
-8. For emails: write a FULL, COMPLETE email — minimum 150 words, maximum 220 words. Never write a short stub.
+8. For emails: write a FULL email — minimum 150 words, maximum 220 words. Never write a short stub.
 
-${system || ''}`;
+${sanitizedSystem}`;
 
-  const userText = sanitizedMessages
-    .map(m => typeof m.content === 'string' ? m.content : (m.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n'))
-    .join('\n');
+  const userText = sanitizedMessages.map(m => m.content).join('\n');
 
   try {
     const response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
