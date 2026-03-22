@@ -557,10 +557,7 @@ ${latexSource}
 Tailor the resume now. Output only the complete LaTeX code.`;
     const result = await callClaude(sys, prompt);
     // Strip any accidental markdown fences
-    tailoredContent = result.replace(/^```latex
-?/i, '').replace(/^```
-?/, '').replace(/
-?```$/, '').trim();
+    tailoredContent = result.replace(/^```latex\n?/i, '').replace(/^```\n?/, '').replace(/\n?```$/, '').trim();
     document.getElementById('resumePreview').textContent = tailoredContent;
     document.getElementById('resumeResult').style.display = 'block';
     done('resume', 'Done -- click Copy LaTeX and paste into Overleaf to compile.', 'ok');
