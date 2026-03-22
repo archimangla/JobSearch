@@ -196,21 +196,25 @@
   <!-- RESUME -->
   <div class="panel" id="tab-resume">
     <div class="card">
-      <p class="card-desc">Your resume is LaTeX-based (Overleaf). Upload it as PDF — the tailored output will be returned as LaTeX so you can paste it straight back into Overleaf.</p>
-      <div class="lbl">Tailoring focus</div>
+      <p class="card-desc">Paste your LaTeX source from Overleaf — the model will tailor it to the JD while preserving every command, environment, and formatting detail exactly.</p>
+      <div class="lbl">Paste your LaTeX source (from Overleaf)</div>
+      <textarea id="latexSource" rows="8" placeholder="Paste your full LaTeX resume code here — \documentclass, \begin{document}, \section, \item etc..."></textarea>
+      <div class="lbl" style="margin-top:10px">Tailoring focus</div>
       <select id="tailorFocus">
-        <option value="highlight matching skills and reorder bullet points to match the JD">Highlight matching skills</option>
-        <option value="rewrite bullet points to use JD keywords while keeping all facts accurate">Rewrite bullets for JD keywords</option>
-        <option value="add a tailored 2–3 line professional summary at the top">Add tailored summary</option>
-        <option value="full tailoring: add a summary, rewrite bullets with JD keywords, reorder skills">Full tailoring</option>
+        <option value="highlight matching skills and reorder \item bullet points to match the JD">Highlight matching skills</option>
+        <option value="rewrite \item bullet points to use JD keywords while keeping all facts accurate">Rewrite bullets for JD keywords</option>
+        <option value="add a tailored 2–3 line summary at the top inside the existing header section">Add tailored summary</option>
+        <option value="full tailoring: add summary, rewrite bullets with JD keywords, reorder skills section">Full tailoring</option>
       </select>
-      <div class="btn-row"><button class="btn primary" onclick="tailorResume()">Tailor resume ↗</button></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn primary" onclick="tailorResume()">Tailor resume ↗</button>
+      </div>
       <div class="prog" id="resumeProg"><div class="prog-fill"></div></div>
       <div class="status" id="resumeStatus"></div>
     </div>
     <div id="resumeResult" style="display:none" class="result-section">
-      <div class="rlbl">Preview</div>
-      <div class="result-box" id="resumePreview"></div>
+      <div class="rlbl">Tailored LaTeX — paste into Overleaf</div>
+      <div class="result-box" id="resumePreview" style="font-family:monospace;font-size:12px;"></div>
       <div class="btn-row">
         <button class="btn primary" onclick="copyEl('resumePreview')">Copy LaTeX</button>
         <button class="btn" onclick="tailorResume()">Re-tailor</button>
@@ -523,20 +527,43 @@ async function generateFormAnswer() {
 }
 
 async function tailorResume() {
-  if (!resumeText) { alert('Upload your resume first and wait for "resume loaded".'); return; }
+  const latexSource = document.getElementById('latexSource').value.trim();
+  if (!latexSource) { alert('Paste your LaTeX source code first.'); return; }
   const c = ctx();
   if (!c.jd) { alert('Paste the job description first.'); return; }
-  setLoading('resume', 'Tailoring resume to JD...');
+  setLoading('resume', 'Tailoring your LaTeX resume to the JD...');
   document.getElementById('resumeResult').style.display = 'none';
   try {
     const focus = document.getElementById('tailorFocus').value;
-    const sys = `You are a professional resume tailor. The applicant uses LaTeX (Overleaf) for their resume. Rules: (1) Never invent experience or skills not in the original resume. (2) Keep all LaTeX structure, commands, and formatting identical — only edit the text content within commands like \\item, \\textbf, etc. (3) Tailoring focus: ${focus}. (4) Output the FULL tailored resume as valid LaTeX code, preserving all \\begin, \\end, \\section, \\item and other LaTeX commands exactly. (5) End with a LaTeX comment: % CHANGES: [one-line summary of what changed]. The output should be pasteable directly into Overleaf.`;
-    const prompt = `Target company: ${c.company||'the company'}\nTarget role: ${c.role||'the role'}\nJob Description:\n${c.jd}\n\nTailor my resume for this JD following the rules above. Output the full resume.`;
+    const sys = `You are a professional LaTeX resume tailor. STRICT RULES:
+1. Never invent any project, skill, experience, or achievement not in the original LaTeX source.
+2. Preserve EVERY LaTeX command exactly — \\documentclass, \\begin, \\end, \\section, \\resumeSubheading, \\resumeItem, \\textbf, \\href, \\item, custom commands — all must remain identical.
+3. Only edit the plain text content inside commands, never the commands themselves.
+4. Keep the exact same structure, order of sections, and number of items unless focus explicitly says to reorder.
+5. Output ONLY the complete valid LaTeX code — no explanation, no markdown fences, no commentary before or after.
+6. End with a single LaTeX comment on the last line: % CHANGES: [one-line summary]
+7. The output must be pasteable directly into Overleaf and compile without errors.`;
+    const prompt = `Tailoring focus: ${focus}
+
+Target company: ${c.company||'the company'}
+Target role: ${c.role||'the role'}
+
+Job Description:
+${c.jd}
+
+Original LaTeX resume source:
+${latexSource}
+
+Tailor the resume now. Output only the complete LaTeX code.`;
     const result = await callClaude(sys, prompt);
-    tailoredContent = result.trim();
+    // Strip any accidental markdown fences
+    tailoredContent = result.replace(/^```latex
+?/i, '').replace(/^```
+?/, '').replace(/
+?```$/, '').trim();
     document.getElementById('resumePreview').textContent = tailoredContent;
     document.getElementById('resumeResult').style.display = 'block';
-    done('resume', 'Done — click Copy LaTeX and paste into Overleaf.', 'ok');
+    done('resume', 'Done — click Copy LaTeX and paste into Overleaf to compile.', 'ok');
   } catch(e) { done('resume', 'Error: '+e.message, 'error'); }
 }
 
