@@ -491,7 +491,7 @@ async function generateEmail() {
     const tone = document.getElementById('emailTone').value;
     const recipient = document.getElementById('recipientName').value.trim();
     const emailInstructions = document.getElementById('emailInstructions').value.trim();
-    const sys = `You draft ${tone} cold outreach emails for job/internship applications. Use the resume provided to ground the email in the applicant's actual background. Keep under 200 words. No filler phrases. End with a clear CTA. Return EXACTLY:\nSUBJECT: [subject line]\nBODY:\n[email body]`;
+    const sys = `You draft ${tone} cold outreach emails for job/internship applications. Use the resume provided to ground the email in the applicant's actual background. IMPORTANT: Write a complete, well-developed email of 150-200 words minimum. Do NOT write a short stub -- include a proper introduction, 2-3 sentences about relevant experience/projects from the resume, why this specific company/role, and a clear CTA. No filler phrases. Return EXACTLY:\nSUBJECT: [subject line]\nBODY:\n[email body]`;
     const prompt = `Company: ${c.company}\nRole: ${c.role}\n${recipient ? 'Recipient: '+recipient : ''}\n${c.jd ? 'JD:\n'+c.jd.slice(0,600) : ''}\n${emailInstructions ? 'SPECIAL INSTRUCTIONS: '+emailInstructions : ''}\n\nDraft the email now.`;
     const result = await callClaude(sys, prompt);
     const subMatch = result.match(/SUBJECT:\s*(.+)/);
