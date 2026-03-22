@@ -78,7 +78,7 @@
 <div class="app">
   <div class="header">
     <h1>Job Search Assistant</h1>
-    <p>Upload your resume &amp; JD once — draft emails, answer forms, tailor resume, update Notion.</p>
+    <p>Upload your resume &amp; JD once -- draft emails, answer forms, tailor resume, update Notion.</p>
   </div>
 
   <div class="ctx-panel">
@@ -196,9 +196,9 @@
   <!-- RESUME -->
   <div class="panel" id="tab-resume">
     <div class="card">
-      <p class="card-desc">Paste your LaTeX source from Overleaf — the model will tailor it to the JD while preserving every command, environment, and formatting detail exactly.</p>
+      <p class="card-desc">Paste your LaTeX source from Overleaf -- the model will tailor it to the JD while preserving every command, environment, and formatting detail exactly.</p>
       <div class="lbl">Paste your LaTeX source (from Overleaf)</div>
-      <textarea id="latexSource" rows="8" placeholder="Paste your full LaTeX resume code here — \documentclass, \begin{document}, \section, \item etc..."></textarea>
+      <textarea id="latexSource" rows="8" placeholder="Paste your full LaTeX resume code here -- \documentclass, \begin{document}, \section, \item etc..."></textarea>
       <div class="lbl" style="margin-top:10px">Tailoring focus</div>
       <select id="tailorFocus">
         <option value="highlight matching skills and reorder \item bullet points to match the JD">Highlight matching skills</option>
@@ -213,7 +213,7 @@
       <div class="status" id="resumeStatus"></div>
     </div>
     <div id="resumeResult" style="display:none" class="result-section">
-      <div class="rlbl">Tailored LaTeX — paste into Overleaf</div>
+      <div class="rlbl">Tailored LaTeX -- paste into Overleaf</div>
       <div class="result-box" id="resumePreview" style="font-family:monospace;font-size:12px;"></div>
       <div class="btn-row">
         <button class="btn primary" onclick="copyEl('resumePreview')">Copy LaTeX</button>
@@ -278,7 +278,7 @@
       <div class="lbl">Notes</div>
       <textarea id="appNotes" rows="2" placeholder="Anything worth tracking..."></textarea>
       <div class="lbl" style="margin-top:12px">Previous email sent (for follow-up context)</div>
-      <textarea id="previousEmail" rows="4" placeholder="Paste the email you previously sent — the follow-up will reference it naturally..."></textarea>
+      <textarea id="previousEmail" rows="4" placeholder="Paste the email you previously sent -- the follow-up will reference it naturally..."></textarea>
       <div class="btn-row">
         <button class="btn primary" onclick="addToNotion()">➕ Add to Notion DB ↗</button>
         <button class="btn" onclick="generateFollowUp()">Generate follow-up email ↗</button>
@@ -413,7 +413,7 @@ async function handleUpload(input) {
     if (resumeText.length > 50) {
       badge.textContent = 'resume loaded'; badge.className = 'badge ok';
     } else {
-      badge.textContent = 'failed — try DOCX'; badge.className = 'badge';
+      badge.textContent = 'failed -- try DOCX'; badge.className = 'badge';
       alert('Could not read text from this PDF. Try uploading as DOCX instead.');
     }
   } catch(e) {
@@ -537,10 +537,10 @@ async function tailorResume() {
     const focus = document.getElementById('tailorFocus').value;
     const sys = `You are a professional LaTeX resume tailor. STRICT RULES:
 1. Never invent any project, skill, experience, or achievement not in the original LaTeX source.
-2. Preserve EVERY LaTeX command exactly — \\documentclass, \\begin, \\end, \\section, \\resumeSubheading, \\resumeItem, \\textbf, \\href, \\item, custom commands — all must remain identical.
+2. Preserve EVERY LaTeX command exactly -- \\documentclass, \\begin, \\end, \\section, \\resumeSubheading, \\resumeItem, \\textbf, \\href, \\item, custom commands -- all must remain identical.
 3. Only edit the plain text content inside commands, never the commands themselves.
 4. Keep the exact same structure, order of sections, and number of items unless focus explicitly says to reorder.
-5. Output ONLY the complete valid LaTeX code — no explanation, no markdown fences, no commentary before or after.
+5. Output ONLY the complete valid LaTeX code -- no explanation, no markdown fences, no commentary before or after.
 6. End with a single LaTeX comment on the last line: % CHANGES: [one-line summary]
 7. The output must be pasteable directly into Overleaf and compile without errors.`;
     const prompt = `Tailoring focus: ${focus}
@@ -563,7 +563,7 @@ Tailor the resume now. Output only the complete LaTeX code.`;
 ?```$/, '').trim();
     document.getElementById('resumePreview').textContent = tailoredContent;
     document.getElementById('resumeResult').style.display = 'block';
-    done('resume', 'Done — click Copy LaTeX and paste into Overleaf to compile.', 'ok');
+    done('resume', 'Done -- click Copy LaTeX and paste into Overleaf to compile.', 'ok');
   } catch(e) { done('resume', 'Error: '+e.message, 'error'); }
 }
 
@@ -575,7 +575,7 @@ async function downloadDocx() {
   try {
     const c = ctx();
     const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, LevelFormat } = window.docx;
-    const numbering = { config: [{ reference: 'bullets', levels: [{ level: 0, format: LevelFormat.BULLET, text: '•', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] }] };
+    const numbering = { config: [{ reference: 'bullets', levels: [{ level: 0, format: LevelFormat.BULLET, text: '*', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] }] };
     const children = [];
     for (const line of tailoredContent.split('\n')) {
       const t = line.trim();
@@ -583,10 +583,10 @@ async function downloadDocx() {
       if (t.startsWith('---')) continue;
       if (t.startsWith('CHANGES:')) {
         children.push(new Paragraph({ children: [new TextRun({ text: t, italics: true, color: '999999', size: 18 })] }));
-      } else if (t === t.toUpperCase() && t.length > 2 && !/^[•\-]/.test(t)) {
+      } else if (t === t.toUpperCase() && t.length > 2 && !/^[*\-]/.test(t)) {
         children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text: t, bold: true, size: 24 })] }));
-      } else if (/^[•\-]/.test(t)) {
-        children.push(new Paragraph({ numbering: { reference: 'bullets', level: 0 }, children: [new TextRun({ text: t.replace(/^[•\-]\s*/, ''), size: 22 })] }));
+      } else if (/^[*\-]/.test(t)) {
+        children.push(new Paragraph({ numbering: { reference: 'bullets', level: 0 }, children: [new TextRun({ text: t.replace(/^[*\-]\s*/, ''), size: 22 })] }));
       } else {
         children.push(new Paragraph({ children: [new TextRun({ text: t, size: 22 })] }));
       }
@@ -631,7 +631,7 @@ async function addToNotion() {
     const data = await res.json();
     if (data.error) { done('notion', 'Error: ' + data.error, 'error'); return; }
     window._notionUrl = data.url;
-    document.getElementById('notionEntry').textContent = '✅ Added!\n\nCompany: ' + c.company + '\nPosition: ' + (c.role||'—') + '\nStatus: ' + payload.status + '\nDate: ' + payload.applicationDate + '\nPortal: ' + payload.portal;
+    document.getElementById('notionEntry').textContent = '[done] Added!\n\nCompany: ' + c.company + '\nPosition: ' + (c.role||'--') + '\nStatus: ' + payload.status + '\nDate: ' + payload.applicationDate + '\nPortal: ' + payload.portal;
     document.getElementById('notionLbl').textContent = 'Added to Notion';
     document.getElementById('notionOpenBtn').style.display = 'inline-flex';
     document.getElementById('notionFollowUpBtns').style.display = 'none';
@@ -649,14 +649,14 @@ async function generateFollowUp() {
     const email = document.getElementById('recruiterEmail') ? document.getElementById('recruiterEmail').value.trim() : '';
     const prevEmail = document.getElementById('previousEmail').value.trim();
     const sys = `Write brief, professional follow-up emails for job applications. Under 120 words. Warm but not desperate. No filler. If a previous email is provided, reference it naturally and don't repeat the same content.`;
-    const prompt = `Company: ${c.company}\nRole: ${c.role}\n${email ? 'To: '+email : ''}\n${prevEmail ? 'Previous email:\n'+prevEmail : 'No previous email — write a general follow-up.'}\n\nWrite the follow-up now.`;
+    const prompt = `Company: ${c.company}\nRole: ${c.role}\n${email ? 'To: '+email : ''}\n${prevEmail ? 'Previous email:\n'+prevEmail : 'No previous email -- write a general follow-up.'}\n\nWrite the follow-up now.`;
     const result = await callClaude(sys, prompt);
     document.getElementById('notionEntry').textContent = result.trim();
     document.getElementById('notionLbl').textContent = 'Follow-up email';
     document.getElementById('notionOpenBtn').style.display = 'none';
     document.getElementById('notionFollowUpBtns').style.display = 'flex';
     document.getElementById('notionResult').style.display = 'block';
-    done('notion', 'Follow-up ready — copy or open in Gmail.', 'ok');
+    done('notion', 'Follow-up ready -- copy or open in Gmail.', 'ok');
   } catch(e) { done('notion', 'Error: '+e.message, 'error'); }
 }
 
@@ -664,7 +664,7 @@ function openFollowUpInGmail() {
   const c = ctx();
   const body = document.getElementById('notionEntry').textContent;
   const email = document.getElementById('recruiterEmail') ? document.getElementById('recruiterEmail').value.trim() : '';
-  const subject = encodeURIComponent('Following up — ' + (c.role||'Role') + ' at ' + (c.company||'Company'));
+  const subject = encodeURIComponent('Following up -- ' + (c.role||'Role') + ' at ' + (c.company||'Company'));
   const url = 'https://mail.google.com/mail/?view=cm&fs=1'
     + (email ? '&to=' + encodeURIComponent(email) : '')
     + '&su=' + subject
@@ -687,10 +687,10 @@ async function generateShortDM() {
     const prompt = `Recipient: ${name||'the hiring manager'} ${role ? '('+role+')' : ''}\nCompany: ${c.company}\nRole: ${c.role}\n${portfolio ? 'Portfolio: '+portfolio : ''}\n${resumeLink ? 'Resume: '+resumeLink : ''}\nJD: ${c.jd ? c.jd.slice(0,300) : '(not provided)'}\n${dmInstructions ? 'SPECIAL INSTRUCTIONS: '+dmInstructions : ''}\n\nMax 200 characters.`;
     const result = await callClaude(sys, prompt);
     document.getElementById('dmText').textContent = result.trim();
-    document.getElementById('dmLbl').textContent = 'Connect request (≤200 chars)';
+    document.getElementById('dmLbl').textContent = 'Connect request (<=200 chars)';
     document.getElementById('dmResult').style.display = 'block';
     const len = result.trim().length;
-    done('dm', `${len} characters ${len > 200 ? '⚠️ over limit — regenerate' : '✓ within limit'}.`, len > 200 ? 'error' : 'ok');
+    done('dm', `${len} characters ${len > 200 ? '!! over limit -- regenerate' : 'v within limit'}.`, len > 200 ? 'error' : 'ok');
   } catch(e) { done('dm', 'Error: '+e.message, 'error'); }
 }
 
@@ -711,7 +711,7 @@ async function generateLongDM() {
     document.getElementById('dmText').textContent = result.trim();
     document.getElementById('dmLbl').textContent = 'Cold outreach DM';
     document.getElementById('dmResult').style.display = 'block';
-    done('dm', 'DM ready — copy and send on LinkedIn.', 'ok');
+    done('dm', 'DM ready -- copy and send on LinkedIn.', 'ok');
   } catch(e) { done('dm', 'Error: '+e.message, 'error'); }
 }
 </script>
